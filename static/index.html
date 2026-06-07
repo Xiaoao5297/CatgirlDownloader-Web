@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title id="htmlTitle">Catgirl Downloader</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="btn-icon" id="menuBtn" aria-label="Toggle sidebar">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <h1 class="logo">
+        <svg class="logo-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <circle cx="9" cy="10" r="1.5" fill="currentColor"/>
+          <circle cx="15" cy="10" r="1.5" fill="currentColor"/>
+          <path d="M8 16c1.5 2 4.5 2 6 0" stroke-width="1.8"/>
+          <line x1="9" y1="6" x2="11" y2="8"/>
+          <line x1="15" y1="6" x2="13" y2="8"/>
+        </svg>
+        <span id="titleText">Catgirl Downloader</span>
+      </h1>
+      <button class="btn-icon" id="aboutBtn" aria-label="About">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Sidebar Overlay (mobile) -->
+  <div class="sidebar-overlay hidden" id="sidebarOverlay"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2 class="sidebar-title" id="settingsTitle">Settings</h2>
+      <button class="btn-icon sidebar-close" id="sidebarClose" aria-label="Close sidebar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="sidebar-body">
+      <!-- Language -->
+      <div class="sidebar-group">
+        <label id="langLabel">Language / 语言</label>
+        <div class="select-wrap">
+          <select id="langSelect">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Source -->
+      <div class="sidebar-group">
+        <label id="srcLabel">Source</label>
+        <div class="select-wrap">
+          <select id="sourceSelect"></select>
+        </div>
+      </div>
+
+      <!-- NSFW -->
+      <div class="sidebar-group">
+        <label id="nsfwLabel">NSFW Filter</label>
+        <div class="select-wrap">
+          <select id="nsfwSelect"></select>
+        </div>
+      </div>
+
+      <!-- Danbooru Tags -->
+      <div class="sidebar-group hidden" id="tagsGroup">
+        <label id="tagsLabel">Danbooru Tags</label>
+        <input type="text" id="tagsInput" placeholder="e.g. cat_ears solo 1girl" />
+      </div>
+
+      <!-- Auto Reload -->
+      <div class="sidebar-group">
+        <label id="reloadLabel">Auto Reload</label>
+        <div class="sidebar-toggle-row">
+          <label class="toggle-label">
+            <input type="checkbox" id="autoReloadToggle" />
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            <span class="toggle-text" id="autoLabel">Off</span>
+          </label>
+          <div class="interval-wrap">
+            <input type="number" id="reloadInterval" class="interval-input" min="1" max="3600" value="30" />
+            <span class="interval-unit" id="unitLabel">sec</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <p class="sidebar-credit" id="creditText">Catgirl Downloader Web</p>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main" id="mainContent">
+
+    <!-- Action Buttons -->
+    <div class="action-bar">
+      <button class="btn btn-primary" id="refreshBtn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/>
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        <span id="refreshText">New Image</span>
+      </button>
+      <button class="btn btn-secondary" id="downloadBtn" disabled>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <span id="saveText">Save</span>
+      </button>
+    </div>
+
+    <!-- Image Card -->
+    <section class="card image-card" id="imageCard">
+      <div class="image-wrapper" id="imageWrapper">
+        <div class="placeholder" id="placeholder">
+          <svg class="placeholder-svg" width="64" height="64" viewBox="0 0 100 100" fill="none" stroke="#9b92b0" stroke-width="1.5">
+            <circle cx="50" cy="50" r="42" stroke="currentColor" opacity="0.3"/>
+            <circle cx="38" cy="40" r="6" fill="currentColor" opacity="0.5"/>
+            <circle cx="62" cy="40" r="6" fill="currentColor" opacity="0.5"/>
+            <path d="M30 62c8 14 24 14 32 0" stroke="currentColor" stroke-width="2.5" opacity="0.5"/>
+            <path d="M36 26l8 8M64 26l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+          </svg>
+          <p class="placeholder-text" id="placeholderText">Click <strong>New Image</strong> to start!</p>
+        </div>
+        <img id="mainImage" class="main-image hidden" alt="Catgirl image" />
+        <div class="spinner hidden" id="spinner">
+          <svg class="spinner-ring" width="36" height="36" viewBox="0 0 36 36">
+            <circle cx="18" cy="18" r="15" fill="none" stroke="#3d3560" stroke-width="3"/>
+            <circle cx="18" cy="18" r="15" fill="none" stroke="#e08ec6" stroke-width="3" stroke-linecap="round" stroke-dasharray="80" stroke-dashoffset="60"/>
+          </svg>
+          <span id="loadingText">Loading...</span>
+        </div>
+      </div>
+
+      <div class="image-info hidden" id="imageInfo">
+        <span id="artistName" class="artist-name"></span>
+        <span class="info-divider">·</span>
+        <span id="sourceName" class="source-name"></span>
+        <div class="info-spacer"></div>
+        <button class="btn-link" id="artInfoBtn" title="About this art">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="progress-bar hidden" id="progressBar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- About Art Modal -->
+  <div class="modal-overlay hidden" id="artModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="artModalTitle">About This Art</h2>
+        <button class="btn-icon modal-close" id="artModalClose" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="info-row">
+          <span class="info-label" id="artistLabel">Artist</span>
+          <span id="modalArtist" class="info-value">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label" id="srcInfoLabel">Source</span>
+          <a id="modalLink" href="#" target="_blank" rel="noopener" class="info-value"><span id="openPageText">Open page ↗</span></a>
+        </div>
+        <div class="info-row">
+          <span class="info-label" id="fileLabel">Filename</span>
+          <span id="modalFilename" class="info-value">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About App Modal -->
+  <div class="modal-overlay hidden" id="aboutModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="aboutModalTitle">About</h2>
+        <button class="btn-icon modal-close" id="aboutModalClose" aria-label="Close">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p id="aboutDesc">A web-based image browser for catgirl, waifu, and Danbooru artwork.</p>
+        <p class="about-credit" id="aboutCredit">Based on <strong>Catgirl Downloader</strong> by NyarchLinux</p>
+        <p class="about-links"><a href="https://github.com/nyarchlinux/catgirldownloader" target="_blank" rel="noopener" id="aboutLink">View on GitHub ↗</a></p>
+      </div>
+    </div>
+  </div>
+
+<script src="app.js"></script>
+</body>
+</html>
