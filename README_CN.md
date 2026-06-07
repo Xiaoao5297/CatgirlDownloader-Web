@@ -29,7 +29,10 @@
 
 ```bash
 cd web
+# Linux
 bash start.sh
+# Windows
+.\start.bash
 ```
 
 或手动运行：

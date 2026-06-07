@@ -26,7 +26,10 @@ A web-based image browser for catgirl, waifu, and Danbooru artwork. Originally a
 
 ```bash
 cd web
+# Linux
 bash start.sh
+# Windows
+.\start.sh
 ```
 
 Or manually:
