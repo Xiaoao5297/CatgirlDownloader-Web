@@ -1,7 +1,5 @@
 # Catgirl Downloader Web
 
-[Chinese ReadMe](README_CN.md)
-
 A web-based image browser for catgirl, waifu, and Danbooru artwork. Originally a Linux GTK4 desktop app, now ported to the browser — works on any device.
 
 ## Features
