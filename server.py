@@ -4,10 +4,10 @@
 import os
 import json
 import uuid
-import mimetypes
+import threading
 from typing import Optional
 
-from flask import Flask, jsonify, request, send_file, render_template
+from flask import Flask, jsonify, request, send_file
 from flask_cors import CORS
 import io
 
@@ -19,10 +19,13 @@ app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
 
 # ── In-memory image cache ──────────────────────────────────────────
-# Maps cache_key -> {"bytes": bytes, "mime": str, "filename": str,
-#                    "artist": Optional[str], "link": Optional[str],
-#                    "source": str}
 _image_cache: dict[str, dict] = {}
+_cache_lock = threading.Lock()
+
+# ── Preload queue ──────────────────────────────────────────────────
+_preload_queue: list[str] = []
+_MAX_PRELOAD = 5
+_preload_lock = threading.Lock()
 
 # ── Source registry ─────────────────────────────────────────────────
 SOURCES = {
@@ -95,6 +98,11 @@ def api_set_config():
             cfg[key] = data[key]
     _save_config(cfg)
 
+    # Clear preload queue when source/nsfw/tags change
+    if any(k in data for k in ("source", "nsfw_mode", "danbooru_tags")):
+        with _preload_lock:
+            _preload_queue.clear()
+
     # If Danbooru tags changed, update the API instance
     if "danbooru_tags" in data:
         danbooru_instance = _get_api("danbooru")
@@ -117,6 +125,74 @@ def _get_api(source: str):
     return None
 
 
+# ── Helpers ─────────────────────────────────────────────────────────
+_MIME_MAP = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+}
+
+
+def _resolve_mime_ext(url: str) -> tuple[str, str]:
+    url_lower = url.lower()
+    for e, m in _MIME_MAP.items():
+        if url_lower.endswith(e):
+            return m, e.lstrip(".")
+    return "image/jpeg", "jpg"
+
+
+def _fetch_and_cache(api, source: str, nsfw: str = "BLOCK_NSFW") -> Optional[str]:
+    """Fetch one image from an API instance and cache it. Returns cache_key or None."""
+    image_url = api.get_image_url(nsfw)
+    if not image_url:
+        return None
+    image_data = api.get_image(image_url)
+    if not image_data:
+        return None
+
+    mime, ext = _resolve_mime_ext(image_url)
+    artist = api.get_artist()
+    link = api.get_link()
+    filename = api.get_filename_suggestion(ext)
+
+    cache_key = str(uuid.uuid4())
+    with _cache_lock:
+        _image_cache[cache_key] = {
+            "bytes": image_data,
+            "mime": mime,
+            "filename": filename,
+            "artist": artist,
+            "link": link,
+            "source": source,
+        }
+        while len(_image_cache) > 50:
+            oldest = next(iter(_image_cache))
+            del _image_cache[oldest]
+
+    return cache_key
+
+
+def _preload_images(source: str, nsfw: str):
+    """Background task: fill preload queue up to _MAX_PRELOAD."""
+    with _preload_lock:
+        needed = _MAX_PRELOAD - len(_preload_queue)
+    for _ in range(needed):
+        try:
+            api = _get_api(source)
+            if not api:
+                break
+            cache_key = _fetch_and_cache(api, source, nsfw)
+            if cache_key:
+                with _preload_lock:
+                    _preload_queue.append(cache_key)
+        except Exception as e:
+            print(f"Preload error: {e}")
+            break
+
+
+# ── API: Fetch image ────────────────────────────────────────────────
 @app.route("/api/fetch")
 def api_fetch():
     source = request.args.get("source", "catgirl")
@@ -125,6 +201,24 @@ def api_fetch():
     if source not in SOURCES:
         return jsonify({"error": f"Unknown source: {source}"}), 400
 
+    # Preload queue hit — return instantly
+    with _preload_lock:
+        if _preload_queue:
+            cache_key = _preload_queue.pop(0)
+            with _cache_lock:
+                entry = _image_cache.get(cache_key)
+            if entry:
+                threading.Thread(target=_preload_images, args=(source, nsfw), daemon=True).start()
+                return jsonify({
+                    "key": cache_key,
+                    "artist": entry["artist"],
+                    "link": entry["link"],
+                    "filename": entry["filename"],
+                    "source": entry["source"],
+                    "mime": entry["mime"],
+                })
+
+    # Normal fetch
     api = _get_api(source)
     if not api:
         return jsonify({"error": "Failed to create API instance"}), 500
@@ -137,45 +231,27 @@ def api_fetch():
     if not image_data:
         return jsonify({"error": "Failed to download image data"}), 502
 
-    # Determine mime type from URL extension
-    url_lower = image_url.lower()
-    mime_map = {
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png": "image/png",
-        ".gif": "image/gif",
-        ".webp": "image/webp",
-    }
-    ext = None
-    for e, m in mime_map.items():
-        if url_lower.endswith(e):
-            mime = m
-            ext = e.lstrip(".")
-            break
-    else:
-        mime = "image/jpeg"
-        ext = "jpg"
-
-    # Get metadata
+    mime, ext = _resolve_mime_ext(image_url)
     artist = api.get_artist()
     link = api.get_link()
     filename = api.get_filename_suggestion(ext)
 
-    # Cache
     cache_key = str(uuid.uuid4())
-    _image_cache[cache_key] = {
-        "bytes": image_data,
-        "mime": mime,
-        "filename": filename,
-        "artist": artist,
-        "link": link,
-        "source": source,
-    }
+    with _cache_lock:
+        _image_cache[cache_key] = {
+            "bytes": image_data,
+            "mime": mime,
+            "filename": filename,
+            "artist": artist,
+            "link": link,
+            "source": source,
+        }
+        while len(_image_cache) > 50:
+            oldest = next(iter(_image_cache))
+            del _image_cache[oldest]
 
-    # Clean old cache entries (> 50)
-    while len(_image_cache) > 50:
-        oldest = next(iter(_image_cache))
-        del _image_cache[oldest]
+    # Trigger background preload
+    threading.Thread(target=_preload_images, args=(source, nsfw), daemon=True).start()
 
     return jsonify({
         "key": cache_key,
@@ -190,7 +266,8 @@ def api_fetch():
 # ── API: Serve image ────────────────────────────────────────────────
 @app.route("/api/image/<key>")
 def api_serve_image(key):
-    entry = _image_cache.get(key)
+    with _cache_lock:
+        entry = _image_cache.get(key)
     if not entry:
         return jsonify({"error": "Image not found or expired"}), 404
 
@@ -204,7 +281,8 @@ def api_serve_image(key):
 # ── API: Download image ─────────────────────────────────────────────
 @app.route("/api/download/<key>")
 def api_download_image(key):
-    entry = _image_cache.get(key)
+    with _cache_lock:
+        entry = _image_cache.get(key)
     if not entry:
         return jsonify({"error": "Image not found or expired"}), 404
 
