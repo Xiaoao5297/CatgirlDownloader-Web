@@ -17,6 +17,9 @@ const LANG = {
     sec: '秒',
     new_image: '新图片',
     save: '保存',
+    favorite: '收藏',
+    favorited: '已收藏',
+    favorites: '收藏夹',
     placeholder: '点击「新图片」开始！',
     loading: '加载中...',
     about_art: '作品信息',
@@ -34,6 +37,14 @@ const LANG = {
     source_names: { catgirl: 'Catgirl (nekos.moe)',
                     waifu: 'Waifu (waifu.im)',
                     danbooru: 'Danbooru' },
+    keyboard: '键盘快捷键',
+    kbd_next: '下一张',
+    kbd_prev: '上一张',
+    kbd_save: '下载',
+    kbd_fav: '收藏',
+    kbd_hint: '点击输入框后按下按键以重新绑定',
+    kbd_listening: '按下按键...',
+    no_favs: '还没有收藏。点击 ☆ 按钮收藏图片。',
   },
   en: {
     title: 'Catgirl Downloader',
@@ -52,6 +63,9 @@ const LANG = {
     sec: 'sec',
     new_image: 'New Image',
     save: 'Save',
+    favorite: 'Favorite',
+    favorited: 'Favorited',
+    favorites: 'Favorites',
     placeholder: 'Click <strong>New Image</strong> to start!',
     loading: 'Loading...',
     about_art: 'About This Art',
@@ -69,6 +83,14 @@ const LANG = {
     source_names: { catgirl: 'Catgirl (nekos.moe)',
                     waifu: 'Waifu (waifu.im)',
                     danbooru: 'Danbooru' },
+    keyboard: 'Keyboard Shortcuts',
+    kbd_next: 'Next',
+    kbd_prev: 'Prev',
+    kbd_save: 'Save',
+    kbd_fav: 'Favorite',
+    kbd_hint: 'Click input then press a key to rebind',
+    kbd_listening: 'Press a key...',
+    no_favs: 'No favorites yet. Click ☆ to save an image.',
   },
 };
 
@@ -88,6 +110,14 @@ const state = {
   reloadTimer: null,
   progressTimer: null,
   progressStart: 0,
+  history: [],
+  historyIndex: -1,
+  favorites: [],
+  keyboardEnabled: true,
+  keyNext: 'Enter',
+  keyPrev: 'ArrowLeft',
+  keyDownload: 'Space',
+  keyFavorite: 'KeyF',
 };
 
 /* ── DOM refs ──────────────────────────────────────────────────── */
@@ -107,6 +137,9 @@ const autoLabel = $('autoLabel');
 const intervalInput = $('reloadInterval');
 const refreshBtn = $('refreshBtn');
 const downloadBtn = $('downloadBtn');
+const prevBtn = $('prevBtn');
+const nextBtn = $('nextBtn');
+const favBtn = $('favBtn');
 const mainImage = $('mainImage');
 const placeholder = $('placeholder');
 const placeholderText = $('placeholderText');
@@ -126,6 +159,19 @@ const modalFilename = $('modalFilename');
 const aboutBtn = $('aboutBtn');
 const aboutModal = $('aboutModal');
 const aboutModalClose = $('aboutModalClose');
+
+const favsBtn = $('favsBtn');
+const favsModal = $('favsModal');
+const favsModalClose = $('favsModalClose');
+const favsList = $('favsList');
+
+const keyboardToggle = $('keyboardToggle');
+const kbdStatus = $('kbdStatus');
+const keyBindings = $('keyBindings');
+const keyNextInput = $('keyNextInput');
+const keyPrevInput = $('keyPrevInput');
+const keySaveInput = $('keySaveInput');
+const keyFavInput = $('keyFavInput');
 
 /* ── i18n apply ─────────────────────────────────────────────────── */
 function t(key) { return LANG[state.lang][key] || LANG.en[key] || key; }
@@ -149,6 +195,7 @@ function applyLang() {
   $('unitLabel').textContent = m.sec;
   $('refreshText').textContent = m.new_image;
   $('saveText').textContent = m.save;
+  $('favText').textContent = m.favorite;
   placeholderText.innerHTML = m.placeholder;
   $('loadingText').textContent = m.loading;
   $('artModalTitle').textContent = m.about_art;
@@ -160,8 +207,14 @@ function applyLang() {
   $('aboutCredit').innerHTML = m.about_credit;
   $('aboutLink').textContent = m.about_link;
   $('creditText').textContent = m.credit;
+  $('favsModalTitle').textContent = m.favorites;
+  $('kbdLabel').textContent = m.keyboard;
+  $('kbdNextLabel').textContent = m.kbd_next;
+  $('kbdPrevLabel').textContent = m.kbd_prev;
+  $('kbdSaveLabel').textContent = m.kbd_save;
+  $('kbdFavLabel').textContent = m.kbd_fav;
+  $('kbdHint').textContent = m.kbd_hint;
 
-  // Source options
   sourceSelect.innerHTML = '';
   ['catgirl', 'waifu', 'danbooru'].forEach(key => {
     const opt = document.createElement('option');
@@ -171,7 +224,6 @@ function applyLang() {
   });
   sourceSelect.value = state.source;
 
-  // NSFW options
   nsfwSelect.innerHTML = '';
   [
     ['BLOCK_NSFW', m.nsfw_block],
@@ -185,10 +237,11 @@ function applyLang() {
   });
   nsfwSelect.value = state.nsfw;
 
-  // Modal links
   if (state.currentArtist) {
     modalArtist.textContent = state.currentArtist;
   }
+
+  updateFavButton();
 }
 
 /* ── Sidebar ───────────────────────────────────────────────────── */
@@ -248,6 +301,64 @@ function showInfo(artist, source) {
   sourceName.textContent = names[source] || source;
 }
 
+function updateNavButtons() {
+  prevBtn.disabled = state.historyIndex <= 0;
+  nextBtn.disabled = state.historyIndex >= state.history.length - 1;
+}
+
+function updateFavButton() {
+  const m = LANG[state.lang];
+  const isFaved = state.currentKey && state.favorites.some(f => f.cacheKey === state.currentKey);
+  $('favText').textContent = isFaved ? m.favorited : m.favorite;
+  if (isFaved) {
+    favBtn.querySelector('svg').setAttribute('fill', 'currentColor');
+    favBtn.querySelector('svg').setAttribute('stroke', 'none');
+  } else {
+    favBtn.querySelector('svg').setAttribute('fill', 'none');
+    favBtn.querySelector('svg').setAttribute('stroke', 'currentColor');
+  }
+}
+
+/* ── History navigation ────────────────────────────────────────── */
+function pushHistory(key, artist, link, filename, source) {
+  if (state.historyIndex < state.history.length - 1) {
+    state.history = state.history.slice(0, state.historyIndex + 1);
+  }
+  state.history.push({ key, artist, link, filename, source });
+  state.historyIndex = state.history.length - 1;
+  updateNavButtons();
+}
+
+function goPrev() {
+  if (state.historyIndex <= 0 || state.isFetching) return;
+  state.historyIndex--;
+  showFromHistory(state.history[state.historyIndex]);
+}
+
+function goNext() {
+  if (state.isFetching) return;
+  if (state.historyIndex < state.history.length - 1) {
+    state.historyIndex++;
+    showFromHistory(state.history[state.historyIndex]);
+  } else {
+    fetchImage();
+  }
+}
+
+function showFromHistory(item) {
+  state.currentKey = item.key;
+  state.currentArtist = item.artist;
+  state.currentLink = item.link;
+  state.currentFilename = item.filename;
+
+  showImage(`/api/image/${item.key}`);
+  showInfo(item.artist, item.source);
+  downloadBtn.disabled = false;
+  favBtn.disabled = false;
+  updateNavButtons();
+  updateFavButton();
+}
+
 /* ── Image fetch ────────────────────────────────────────────────── */
 async function fetchImage() {
   if (state.isFetching) return;
@@ -266,9 +377,13 @@ async function fetchImage() {
     state.currentLink = data.link;
     state.currentFilename = data.filename;
 
+    pushHistory(data.key, data.artist, data.link, data.filename, data.source);
+
     showImage(`/api/image/${data.key}`);
     showInfo(data.artist, data.source);
     downloadBtn.disabled = false;
+    favBtn.disabled = false;
+    updateFavButton();
   } catch {
     showLoading(false);
     placeholder.classList.remove('hidden');
@@ -290,6 +405,159 @@ function downloadImage() {
   a.click();
   document.body.removeChild(a);
 }
+
+/* ── Favorites ──────────────────────────────────────────────────── */
+async function loadFavorites() {
+  try {
+    state.favorites = await apiJson('/api/favorites');
+  } catch {
+    state.favorites = [];
+  }
+}
+
+async function toggleFavorite() {
+  if (!state.currentKey) return;
+  const existing = state.favorites.find(f => f.cacheKey === state.currentKey);
+  if (existing) {
+    try {
+      await api(`/api/favorites/${existing.id}`, { method: 'DELETE' });
+      state.favorites = state.favorites.filter(f => f.id !== existing.id);
+      updateFavButton();
+    } catch (e) {
+      console.error('Failed to remove favorite:', e);
+    }
+    return;
+  }
+  try {
+    const fav = await apiJson(`/api/favorites/${state.currentKey}`, { method: 'POST' });
+    fav.cacheKey = state.currentKey;
+    state.favorites.unshift(fav);
+    updateFavButton();
+  } catch (e) {
+    console.error('Failed to add favorite:', e);
+  }
+}
+
+function renderFavorites() {
+  const m = LANG[state.lang];
+  if (state.favorites.length === 0) {
+    favsList.innerHTML = `<p class="favs-empty">${m.no_favs}</p>`;
+    return;
+  }
+
+  favsList.innerHTML = state.favorites.map(f => `
+    <div class="fav-item" data-id="${f.id}">
+      <img class="fav-thumb" src="/api/favorites/${f.id}/image" alt="${f.artist || ''}" loading="lazy" />
+      <div class="fav-info">
+        <span class="fav-artist">${f.artist || m.artist_unknown}</span>
+        <span class="fav-source">${(m.source_names[f.source] || f.source)}</span>
+      </div>
+      <button class="btn-icon fav-del" data-id="${f.id}" title="Delete">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+      </button>
+    </div>
+  `).join('');
+
+  favsList.querySelectorAll('.fav-item').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target.closest('.fav-del')) return;
+      const fav = state.favorites.find(f => f.id === el.dataset.id);
+      if (fav) {
+        state.currentKey = fav.id;
+        state.currentArtist = fav.artist;
+        state.currentLink = fav.link;
+        state.currentFilename = fav.filename;
+        pushHistory(fav.id, fav.artist, fav.link, fav.filename, fav.source);
+        showImage(`/api/favorites/${fav.id}/image`);
+        showInfo(fav.artist, fav.source);
+        downloadBtn.disabled = false;
+        favBtn.disabled = false;
+        updateFavButton();
+        favsModal.classList.add('hidden');
+      }
+    });
+  });
+
+  favsList.querySelectorAll('.fav-del').forEach(btn => {
+    btn.addEventListener('click', async e => {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      try {
+        await api(`/api/favorites/${id}`, { method: 'DELETE' });
+        state.favorites = state.favorites.filter(f => f.id !== id);
+        updateFavButton();
+        renderFavorites();
+      } catch (err) {
+        console.error('Failed to delete favorite:', err);
+      }
+    });
+  });
+}
+
+async function openFavorites() {
+  await loadFavorites();
+  renderFavorites();
+  favsModal.classList.remove('hidden');
+}
+
+/* ── Keyboard ───────────────────────────────────────────────────── */
+function keyDisplayName(code) {
+  const map = {
+    'Enter': 'Enter ↵',
+    'Space': 'Space',
+    'ArrowLeft': '←',
+    'ArrowRight': '→',
+    'ArrowUp': '↑',
+    'ArrowDown': '↓',
+    'KeyF': 'F',
+    'KeyS': 'S',
+    'KeyR': 'R',
+    'KeyD': 'D',
+  };
+  return map[code] || code.replace('Key', '');
+}
+
+function updateKeyInputs() {
+  keyNextInput.value = keyDisplayName(state.keyNext);
+  keyPrevInput.value = keyDisplayName(state.keyPrev);
+  keySaveInput.value = keyDisplayName(state.keyDownload);
+  keyFavInput.value = keyDisplayName(state.keyFavorite);
+}
+
+function enableKeyCapture(input, configKey) {
+  const m = LANG[state.lang];
+  input.addEventListener('focus', () => {
+    input.value = m.kbd_listening;
+    input.dataset.capturing = 'true';
+  });
+  input.addEventListener('blur', () => {
+    input.dataset.capturing = 'false';
+    updateKeyInputs();
+  });
+  input.addEventListener('keydown', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    state[configKey] = e.code;
+    input.value = keyDisplayName(e.code);
+    input.blur();
+    const cfgKey = 'key_' + configKey.replace(/^key/, '').replace(/[A-Z]/g, c => '_' + c.toLowerCase());
+    saveConfig({ [cfgKey]: e.code });
+  });
+}
+
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,select,textarea')) return;
+  if (document.activeElement && document.activeElement.dataset.capturing === 'true') return;
+  if (!state.keyboardEnabled) return;
+
+  const code = e.code;
+  if (code === state.keyNext) { e.preventDefault(); goNext(); }
+  else if (code === state.keyPrev) { e.preventDefault(); goPrev(); }
+  else if (code === state.keyDownload) { e.preventDefault(); downloadImage(); }
+  else if (code === state.keyFavorite) { e.preventDefault(); toggleFavorite(); }
+});
 
 /* ── Auto-reload ────────────────────────────────────────────────── */
 function scheduleNextReload() {
@@ -349,6 +617,11 @@ async function loadConfig() {
   state.autoReload = cfg.auto_reload || false;
   state.reloadInterval = cfg.auto_reload_interval || 30;
   state.danbooruTags = cfg.danbooru_tags || '';
+  state.keyboardEnabled = cfg.keyboard_enabled !== false;
+  state.keyNext = cfg.key_next || 'Enter';
+  state.keyPrev = cfg.key_prev || 'ArrowLeft';
+  state.keyDownload = cfg.key_download || 'Space';
+  state.keyFavorite = cfg.key_favorite || 'KeyF';
 
   langSelect.value = state.lang;
   applyLang();
@@ -359,6 +632,10 @@ async function loadConfig() {
   intervalInput.value = state.reloadInterval;
   tagsInput.value = state.danbooruTags;
   toggleTagsGroup(state.source);
+  keyboardToggle.checked = state.keyboardEnabled;
+  kbdStatus.textContent = state.keyboardEnabled ? t('on') : t('off');
+  keyBindings.classList.toggle('hidden', !state.keyboardEnabled);
+  updateKeyInputs();
 
   if (state.autoReload) startAutoReload();
 }
@@ -379,8 +656,9 @@ function toggleTagsGroup(source) {
 langSelect.addEventListener('change', () => {
   state.lang = langSelect.value;
   applyLang();
-  // re-apply dynamic text
   autoLabel.textContent = state.autoReload ? t('on') : t('off');
+  kbdStatus.textContent = state.keyboardEnabled ? t('on') : t('off');
+  updateKeyInputs();
   saveConfig({ lang: state.lang });
 });
 
@@ -420,8 +698,24 @@ intervalInput.addEventListener('change', () => {
   if (state.autoReload) startAutoReload();
 });
 
+keyboardToggle.addEventListener('change', () => {
+  state.keyboardEnabled = keyboardToggle.checked;
+  kbdStatus.textContent = state.keyboardEnabled ? t('on') : t('off');
+  keyBindings.classList.toggle('hidden', !state.keyboardEnabled);
+  saveConfig({ keyboard_enabled: state.keyboardEnabled });
+});
+
+enableKeyCapture(keyNextInput, 'keyNext');
+enableKeyCapture(keyPrevInput, 'keyPrev');
+enableKeyCapture(keySaveInput, 'keyDownload');
+enableKeyCapture(keyFavInput, 'keyFavorite');
+
 refreshBtn.addEventListener('click', fetchImage);
+prevBtn.addEventListener('click', goPrev);
+nextBtn.addEventListener('click', goNext);
 downloadBtn.addEventListener('click', downloadImage);
+favBtn.addEventListener('click', toggleFavorite);
+favsBtn.addEventListener('click', openFavorites);
 
 /* ── Modals ────────────────────────────────────────────────────── */
 artInfoBtn.addEventListener('click', () => {
@@ -439,15 +733,21 @@ aboutBtn.addEventListener('click', () => aboutModal.classList.remove('hidden'));
 aboutModalClose.addEventListener('click', () => aboutModal.classList.add('hidden'));
 aboutModal.addEventListener('click', e => { if (e.target === aboutModal) aboutModal.classList.add('hidden'); });
 
+favsModalClose.addEventListener('click', () => favsModal.classList.add('hidden'));
+favsModal.addEventListener('click', e => { if (e.target === favsModal) favsModal.classList.add('hidden'); });
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { artModal.classList.add('hidden'); aboutModal.classList.add('hidden'); }
-  if (e.key === 'r' && !e.ctrlKey && !e.metaKey && !e.target.closest('input,select')) { e.preventDefault(); fetchImage(); }
-  if (e.key === 's' && !e.ctrlKey && !e.metaKey && !e.target.closest('input,select')) { e.preventDefault(); downloadImage(); }
+  if (e.key === 'Escape') {
+    artModal.classList.add('hidden');
+    aboutModal.classList.add('hidden');
+    favsModal.classList.add('hidden');
+  }
 });
 
 /* ── Init ────────────────────────────────────────────────────────── */
 async function init() {
   await loadConfig();
+  await loadFavorites();
   fetchImage();
 }
 

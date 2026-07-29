@@ -345,6 +345,33 @@ select:focus, input:focus {
   cursor: not-allowed;
 }
 
+.btn-icon-only {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: var(--transition);
+  display: grid;
+  place-items: center;
+}
+
+.btn-icon-only:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--text-dim);
+}
+
+.btn-icon-only:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.action-bar-sub { margin-top: -2px; }
+
 /* ── Image Card ──────────────────────────────────────────────────── */
 .card {
   background: var(--bg-card);
@@ -551,6 +578,132 @@ select:focus, input:focus {
 .about-links { margin-top: 10px; }
 .about-links a { color: var(--accent-light); text-decoration: none; font-weight: 600; }
 .about-links a:hover { text-decoration: underline; }
+
+/* ── Keyboard bindings ─────────────────────────────────────────── */
+.key-bindings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.key-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.key-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.key-input {
+  width: 110px;
+  height: 30px;
+  text-align: center;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  cursor: pointer;
+  background: var(--bg);
+  font-family: var(--font);
+}
+
+.key-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.key-hint {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  opacity: 0.6;
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+/* ── Favorites modal ───────────────────────────────────────────── */
+.favs-modal { max-width: 640px; max-height: 80vh; display: flex; flex-direction: column; }
+
+.favs-body {
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.favs-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  padding: 32px 0;
+}
+
+.fav-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+
+.fav-item:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.fav-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+
+.fav-info {
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fav-artist {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fav-source {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.fav-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.fav-item:hover .fav-del { opacity: 1; }
+
+.fav-del:hover {
+  background: rgba(220, 60, 60, 0.8);
+  color: white;
+}
 
 /* ── Responsive ────────────────────────────────────────────────── */
 

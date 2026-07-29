@@ -4,7 +4,9 @@
 import os
 import json
 import uuid
+import shutil
 import threading
+from datetime import datetime, timezone
 from typing import Optional
 
 from flask import Flask, jsonify, request, send_file
@@ -56,7 +58,17 @@ _DEFAULT_CONFIG = {
     "auto_reload": False,
     "auto_reload_interval": 30,
     "danbooru_tags": "",
+    "keyboard_enabled": True,
+    "key_next": "Enter",
+    "key_prev": "ArrowLeft",
+    "key_download": "Space",
+    "key_favorite": "KeyF",
 }
+
+# ── Favorites storage ──────────────────────────────────────────────
+FAVORITES_DIR = os.path.join(CONFIG_DIR, "favorites")
+FAVORITES_FILE = os.path.join(FAVORITES_DIR, "favorites.json")
+os.makedirs(FAVORITES_DIR, exist_ok=True)
 
 
 def _load_config() -> dict:
@@ -292,6 +304,90 @@ def api_download_image(key):
         as_attachment=True,
         download_name=entry["filename"],
     )
+
+
+# ── Favorites helpers ──────────────────────────────────────────────
+def _load_favorites() -> list[dict]:
+    try:
+        if os.path.exists(FAVORITES_FILE):
+            with open(FAVORITES_FILE, "r") as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading favorites: {e}")
+    return []
+
+
+def _save_favorites(favs: list[dict]) -> None:
+    with open(FAVORITES_FILE, "w") as f:
+        json.dump(favs, f, indent=2, ensure_ascii=False)
+
+
+# ── API: Favorites ─────────────────────────────────────────────────
+@app.route("/api/favorites", methods=["GET"])
+def api_list_favorites():
+    return jsonify(_load_favorites())
+
+
+@app.route("/api/favorites/<cache_key>", methods=["POST"])
+def api_add_favorite(cache_key: str):
+    with _cache_lock:
+        entry = _image_cache.get(cache_key)
+    if not entry:
+        return jsonify({"error": "Image not found in cache"}), 404
+
+    fav_id = str(uuid.uuid4())
+    ext = entry["filename"].rsplit(".", 1)[-1] if "." in entry["filename"] else "jpg"
+    file_path = os.path.join(FAVORITES_DIR, f"{fav_id}.{ext}")
+
+    with open(file_path, "wb") as f:
+        f.write(entry["bytes"])
+
+    fav_entry = {
+        "id": fav_id,
+        "filename": entry["filename"],
+        "ext": ext,
+        "artist": entry["artist"],
+        "link": entry["link"],
+        "source": entry["source"],
+        "mime": entry["mime"],
+        "saved_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    favs = _load_favorites()
+    favs.insert(0, fav_entry)
+    _save_favorites(favs)
+
+    return jsonify(fav_entry)
+
+
+@app.route("/api/favorites/<fav_id>/image")
+def api_serve_favorite(fav_id: str):
+    favs = _load_favorites()
+    fav = next((f for f in favs if f["id"] == fav_id), None)
+    if not fav:
+        return jsonify({"error": "Favorite not found"}), 404
+
+    file_path = os.path.join(FAVORITES_DIR, f"{fav_id}.{fav['ext']}")
+    if not os.path.exists(file_path):
+        return jsonify({"error": "Favorite file missing"}), 404
+
+    return send_file(file_path, mimetype=fav["mime"])
+
+
+@app.route("/api/favorites/<fav_id>", methods=["DELETE"])
+def api_delete_favorite(fav_id: str):
+    favs = _load_favorites()
+    fav = next((f for f in favs if f["id"] == fav_id), None)
+    if not fav:
+        return jsonify({"error": "Favorite not found"}), 404
+
+    file_path = os.path.join(FAVORITES_DIR, f"{fav_id}.{fav['ext']}")
+    if os.path.exists(file_path):
+        os.remove(file_path)
+
+    favs = [f for f in favs if f["id"] != fav_id]
+    _save_favorites(favs)
+    return jsonify({"ok": True})
 
 
 # ── Serve frontend ──────────────────────────────────────────────────
