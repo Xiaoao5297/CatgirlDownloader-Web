@@ -83,52 +83,6 @@ class NekosDownloaderAPI(CategoryDownloaderAPI):
         return f"nekosapi_{image_id}"
 
 
-class WaifuPicsDownloaderAPI(CategoryDownloaderAPI):
-    def __init__(self, category: str = "", api_key: str = "") -> None:
-        super().__init__(category, api_key)
-        self.endpoint = "https://api.waifu.pics"
-
-    def get_image_url(self, nsfw_mode: str = "BLOCK_NSFW") -> Optional[str]:
-        path = "sfw"
-        if nsfw_mode == "ONLY_NSFW":
-            path = "nsfw"
-        elif nsfw_mode == "SHOW_EVERYTHING":
-            path = random.choice(["sfw", "nsfw"])
-        tag = self.category or "waifu"
-        try:
-            r = requests.get(f"{self.endpoint}/{path}/{tag}", timeout=10)
-            if r.status_code != 200:
-                return None
-            data = r.json()
-            self.info = data
-            return data.get("url")
-        except Exception as e:
-            print(f"Waifu.pics error: {e}")
-        return None
-
-    def get_artist(self, info: Optional[dict] = None) -> Optional[str]:
-        return None
-
-    def get_link(self, info: Optional[dict] = None) -> Optional[str]:
-        data = info if info else self.info
-        if not data:
-            return None
-        try:
-            return data.get("url")
-        except Exception:
-            return None
-
-    def get_filename_suggestion(self, extension: Optional[str], info: Optional[dict] = None) -> str:
-        data = info if info else self.info
-        if not data:
-            image_id = str(int(time.time()))
-        else:
-            image_id = str(int(time.time() * 1000))
-        if extension:
-            return f"waifupics_{image_id}.{extension}"
-        return f"waifupics_{image_id}"
-
-
 class PurrbotDownloaderAPI(CategoryDownloaderAPI):
     def __init__(self, category: str = "", api_key: str = "") -> None:
         super().__init__(category, api_key)

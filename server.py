@@ -18,7 +18,6 @@ from src.waifu import WaifuDownloaderAPI
 from src.danbooru import DanbooruDownloaderAPI
 from src.anime import (
     NekosDownloaderAPI,
-    WaifuPicsDownloaderAPI,
     PurrbotDownloaderAPI,
     FluxpointDownloaderAPI,
 )
@@ -56,11 +55,6 @@ SOURCES = {
         "name": "Nekos API",
         "has_tags": True,
         "tags_label": "Category",
-    },
-    "waifupics": {
-        "name": "Waifu.pics",
-        "has_tags": True,
-        "tags_label": "Tag",
     },
     "purrbot": {
         "name": "PurrBot",
@@ -172,8 +166,6 @@ def _get_api(source: str):
         return api
     elif source == "nekos":
         return NekosDownloaderAPI(cfg.get("category", ""))
-    elif source == "waifupics":
-        return WaifuPicsDownloaderAPI(cfg.get("category", ""))
     elif source == "purrbot":
         return PurrbotDownloaderAPI(cfg.get("category", ""))
     elif source == "fluxpoint":
