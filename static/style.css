@@ -396,7 +396,12 @@ select:focus, input:focus {
   min-height: 250px;
   background: radial-gradient(ellipse at center, var(--bg-card) 0%, var(--bg) 100%);
   overflow: hidden;
+  touch-action: none;
+  cursor: grab;
 }
+
+.image-wrapper.zoomed { cursor: grab; }
+.image-wrapper.panning { cursor: grabbing; }
 
 .placeholder {
   text-align: center;
@@ -415,7 +420,27 @@ select:focus, input:focus {
   width: auto;
   height: auto;
   object-fit: contain;
+  transform-origin: center center;
+  will-change: transform;
   animation: fadeIn 0.35s ease;
+}
+
+.zoom-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(26, 22, 37, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  user-select: none;
 }
 
 @keyframes fadeIn {

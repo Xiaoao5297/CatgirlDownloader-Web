@@ -78,10 +78,16 @@
         </div>
       </div>
 
-      <!-- Danbooru Tags -->
+      <!-- Danbooru Tags / Category -->
       <div class="sidebar-group hidden" id="tagsGroup">
         <label id="tagsLabel">Danbooru Tags</label>
         <input type="text" id="tagsInput" placeholder="e.g. cat_ears solo 1girl" />
+      </div>
+
+      <!-- API Key (Fluxpoint) -->
+      <div class="sidebar-group hidden" id="keyGroup">
+        <label id="keyLabel">API Key</label>
+        <input type="password" id="keyInput" placeholder="API key" />
       </div>
 
       <!-- Auto Reload -->
@@ -179,6 +185,7 @@
           <p class="placeholder-text" id="placeholderText">Click <strong>New Image</strong> to start!</p>
         </div>
         <img id="mainImage" class="main-image hidden" alt="Catgirl image" />
+        <div class="zoom-badge hidden" id="zoomBadge">100%</div>
         <div class="spinner hidden" id="spinner">
           <svg class="spinner-ring" width="36" height="36" viewBox="0 0 36 36">
             <circle cx="18" cy="18" r="15" fill="none" stroke="#3d3560" stroke-width="3"/>

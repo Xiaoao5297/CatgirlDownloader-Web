@@ -16,6 +16,12 @@ import io
 from src.catgirl import CatgirlDownloaderAPI
 from src.waifu import WaifuDownloaderAPI
 from src.danbooru import DanbooruDownloaderAPI
+from src.anime import (
+    NekosDownloaderAPI,
+    WaifuPicsDownloaderAPI,
+    PurrbotDownloaderAPI,
+    FluxpointDownloaderAPI,
+)
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 CORS(app)
@@ -25,7 +31,9 @@ _image_cache: dict[str, dict] = {}
 _cache_lock = threading.Lock()
 
 # ── Preload queue ──────────────────────────────────────────────────
-_preload_queue: list[str] = []
+# Keyed by (source, nsfw_mode) so one source's preloaded images are
+# never served to a request for a different source.
+_preload_queue: dict[tuple[str, str], list[str]] = {}
 _MAX_PRELOAD = 5
 _preload_lock = threading.Lock()
 
@@ -42,6 +50,28 @@ SOURCES = {
     "danbooru": {
         "name": "Danbooru",
         "has_tags": True,
+        "tags_label": "Danbooru Tags",
+    },
+    "nekos": {
+        "name": "Nekos API",
+        "has_tags": True,
+        "tags_label": "Category",
+    },
+    "waifupics": {
+        "name": "Waifu.pics",
+        "has_tags": True,
+        "tags_label": "Tag",
+    },
+    "purrbot": {
+        "name": "PurrBot",
+        "has_tags": True,
+        "tags_label": "Category",
+    },
+    "fluxpoint": {
+        "name": "Fluxpoint",
+        "has_tags": True,
+        "tags_label": "Category",
+        "needs_key": True,
     },
 }
 
@@ -50,6 +80,7 @@ NSFW_MODES = ["BLOCK_NSFW", "ONLY_NSFW", "SHOW_EVERYTHING"]
 # ── Preferences file ────────────────────────────────────────────────
 CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "catgirldownloader-web")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "config.json")
+_config_lock = threading.Lock()
 
 _DEFAULT_CONFIG = {
     "lang": "auto",
@@ -58,6 +89,8 @@ _DEFAULT_CONFIG = {
     "auto_reload": False,
     "auto_reload_interval": 30,
     "danbooru_tags": "",
+    "category": "",
+    "fluxpoint_key": "",
     "keyboard_enabled": True,
     "key_next": "Enter",
     "key_prev": "ArrowLeft",
@@ -68,31 +101,34 @@ _DEFAULT_CONFIG = {
 # ── Favorites storage ──────────────────────────────────────────────
 FAVORITES_DIR = os.path.join(CONFIG_DIR, "favorites")
 FAVORITES_FILE = os.path.join(FAVORITES_DIR, "favorites.json")
+_favorites_lock = threading.Lock()
 os.makedirs(FAVORITES_DIR, exist_ok=True)
 
 
 def _load_config() -> dict:
-    try:
-        if os.path.exists(CONFIG_FILE):
-            with open(CONFIG_FILE, "r") as f:
-                cfg = json.load(f)
-                return {**_DEFAULT_CONFIG, **cfg}
-    except Exception as e:
-        print(f"Error loading config: {e}")
+    with _config_lock:
+        try:
+            if os.path.exists(CONFIG_FILE):
+                with open(CONFIG_FILE, "r") as f:
+                    cfg = json.load(f)
+                    return {**_DEFAULT_CONFIG, **cfg}
+        except Exception as e:
+            print(f"Error loading config: {e}")
     return dict(_DEFAULT_CONFIG)
 
 
 def _save_config(cfg: dict) -> None:
-    os.makedirs(CONFIG_DIR, exist_ok=True)
-    merged = {**_DEFAULT_CONFIG, **cfg}
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(merged, f, indent=2)
+    with _config_lock:
+        os.makedirs(CONFIG_DIR, exist_ok=True)
+        merged = {**_DEFAULT_CONFIG, **cfg}
+        with open(CONFIG_FILE, "w") as f:
+            json.dump(merged, f, indent=2)
 
 
 # ── API: Sources ────────────────────────────────────────────────────
 @app.route("/api/sources")
 def api_sources():
-    return jsonify(list(SOURCES.values()))
+    return jsonify([{"key": k, **v} for k, v in SOURCES.items()])
 
 
 # ── API: Config ─────────────────────────────────────────────────────
@@ -110,8 +146,8 @@ def api_set_config():
             cfg[key] = data[key]
     _save_config(cfg)
 
-    # Clear preload queue when source/nsfw/tags change
-    if any(k in data for k in ("source", "nsfw_mode", "danbooru_tags")):
+    # Clear preload queue when source/nsfw/tags/category/key change
+    if any(k in data for k in ("source", "nsfw_mode", "danbooru_tags", "category", "fluxpoint_key")):
         with _preload_lock:
             _preload_queue.clear()
 
@@ -125,15 +161,23 @@ def api_set_config():
 
 # ── API: Fetch image ────────────────────────────────────────────────
 def _get_api(source: str):
+    cfg = _load_config()
     if source == "catgirl":
         return CatgirlDownloaderAPI()
     elif source == "waifu":
         return WaifuDownloaderAPI()
     elif source == "danbooru":
         api = DanbooruDownloaderAPI()
-        cfg = _load_config()
         api.set_tags(cfg.get("danbooru_tags", ""))
         return api
+    elif source == "nekos":
+        return NekosDownloaderAPI(cfg.get("category", ""))
+    elif source == "waifupics":
+        return WaifuPicsDownloaderAPI(cfg.get("category", ""))
+    elif source == "purrbot":
+        return PurrbotDownloaderAPI(cfg.get("category", ""))
+    elif source == "fluxpoint":
+        return FluxpointDownloaderAPI(cfg.get("category", ""), cfg.get("fluxpoint_key", ""))
     return None
 
 
@@ -187,9 +231,11 @@ def _fetch_and_cache(api, source: str, nsfw: str = "BLOCK_NSFW") -> Optional[str
 
 
 def _preload_images(source: str, nsfw: str):
-    """Background task: fill preload queue up to _MAX_PRELOAD."""
+    """Background task: fill the preload queue for this (source, nsfw) pair."""
+    key = (source, nsfw)
     with _preload_lock:
-        needed = _MAX_PRELOAD - len(_preload_queue)
+        queue = _preload_queue.setdefault(key, [])
+        needed = _MAX_PRELOAD - len(queue)
     for _ in range(needed):
         try:
             api = _get_api(source)
@@ -198,7 +244,7 @@ def _preload_images(source: str, nsfw: str):
             cache_key = _fetch_and_cache(api, source, nsfw)
             if cache_key:
                 with _preload_lock:
-                    _preload_queue.append(cache_key)
+                    _preload_queue.setdefault(key, []).append(cache_key)
         except Exception as e:
             print(f"Preload error: {e}")
             break
@@ -214,21 +260,23 @@ def api_fetch():
         return jsonify({"error": f"Unknown source: {source}"}), 400
 
     # Preload queue hit — return instantly
+    key = (source, nsfw)
     with _preload_lock:
-        if _preload_queue:
-            cache_key = _preload_queue.pop(0)
-            with _cache_lock:
-                entry = _image_cache.get(cache_key)
-            if entry:
-                threading.Thread(target=_preload_images, args=(source, nsfw), daemon=True).start()
-                return jsonify({
-                    "key": cache_key,
-                    "artist": entry["artist"],
-                    "link": entry["link"],
-                    "filename": entry["filename"],
-                    "source": entry["source"],
-                    "mime": entry["mime"],
-                })
+        queue = _preload_queue.get(key)
+        cache_key = queue.pop(0) if queue else None
+    if cache_key is not None:
+        with _cache_lock:
+            entry = _image_cache.get(cache_key)
+        if entry:
+            threading.Thread(target=_preload_images, args=(source, nsfw), daemon=True).start()
+            return jsonify({
+                "key": cache_key,
+                "artist": entry["artist"],
+                "link": entry["link"],
+                "filename": entry["filename"],
+                "source": entry["source"],
+                "mime": entry["mime"],
+            })
 
     # Normal fetch
     api = _get_api(source)
@@ -308,18 +356,20 @@ def api_download_image(key):
 
 # ── Favorites helpers ──────────────────────────────────────────────
 def _load_favorites() -> list[dict]:
-    try:
-        if os.path.exists(FAVORITES_FILE):
-            with open(FAVORITES_FILE, "r") as f:
-                return json.load(f)
-    except Exception as e:
-        print(f"Error loading favorites: {e}")
+    with _favorites_lock:
+        try:
+            if os.path.exists(FAVORITES_FILE):
+                with open(FAVORITES_FILE, "r") as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"Error loading favorites: {e}")
     return []
 
 
 def _save_favorites(favs: list[dict]) -> None:
-    with open(FAVORITES_FILE, "w") as f:
-        json.dump(favs, f, indent=2, ensure_ascii=False)
+    with _favorites_lock:
+        with open(FAVORITES_FILE, "w") as f:
+            json.dump(favs, f, indent=2, ensure_ascii=False)
 
 
 # ── API: Favorites ─────────────────────────────────────────────────
@@ -344,6 +394,7 @@ def api_add_favorite(cache_key: str):
 
     fav_entry = {
         "id": fav_id,
+        "cacheKey": cache_key,
         "filename": entry["filename"],
         "ext": ext,
         "artist": entry["artist"],
@@ -372,6 +423,25 @@ def api_serve_favorite(fav_id: str):
         return jsonify({"error": "Favorite file missing"}), 404
 
     return send_file(file_path, mimetype=fav["mime"])
+
+
+@app.route("/api/favorites/<fav_id>/download")
+def api_download_favorite(fav_id: str):
+    favs = _load_favorites()
+    fav = next((f for f in favs if f["id"] == fav_id), None)
+    if not fav:
+        return jsonify({"error": "Favorite not found"}), 404
+
+    file_path = os.path.join(FAVORITES_DIR, f"{fav_id}.{fav['ext']}")
+    if not os.path.exists(file_path):
+        return jsonify({"error": "Favorite file missing"}), 404
+
+    return send_file(
+        file_path,
+        mimetype=fav["mime"],
+        as_attachment=True,
+        download_name=fav["filename"],
+    )
 
 
 @app.route("/api/favorites/<fav_id>", methods=["DELETE"])

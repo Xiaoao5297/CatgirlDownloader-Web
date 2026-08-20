@@ -11,6 +11,8 @@ const LANG = {
     nsfw_all: '全部显示',
     danbooru_tags: 'Danbooru 标签',
     tags_placeholder: '例如：cat_ears solo 1girl',
+    category: '分类',
+    api_key: 'API Key',
     auto_reload: '自动刷新',
     on: '开',
     off: '关',
@@ -34,9 +36,6 @@ const LANG = {
     about_link: '在 GitHub 上查看 ↗',
     credit: 'Catgirl Downloader Web',
     error_load: '图片加载失败，请重试！',
-    source_names: { catgirl: 'Catgirl (nekos.moe)',
-                    waifu: 'Waifu (waifu.im)',
-                    danbooru: 'Danbooru' },
     keyboard: '键盘快捷键',
     kbd_next: '下一张',
     kbd_prev: '上一张',
@@ -57,6 +56,8 @@ const LANG = {
     nsfw_all: 'Show All',
     danbooru_tags: 'Danbooru Tags',
     tags_placeholder: 'e.g. cat_ears solo 1girl',
+    category: 'Category',
+    api_key: 'API Key',
     auto_reload: 'Auto Reload',
     on: 'On',
     off: 'Off',
@@ -80,9 +81,6 @@ const LANG = {
     about_link: 'View on GitHub ↗',
     credit: 'Catgirl Downloader Web',
     error_load: 'Could not load image. Try again!',
-    source_names: { catgirl: 'Catgirl (nekos.moe)',
-                    waifu: 'Waifu (waifu.im)',
-                    danbooru: 'Danbooru' },
     keyboard: 'Keyboard Shortcuts',
     kbd_next: 'Next',
     kbd_prev: 'Prev',
@@ -103,6 +101,7 @@ const state = {
   reloadInterval: 30,
   danbooruTags: '',
   currentKey: null,
+  currentFavId: null,
   currentArtist: null,
   currentLink: null,
   currentFilename: null,
@@ -113,6 +112,10 @@ const state = {
   history: [],
   historyIndex: -1,
   favorites: [],
+  sources: [],
+  category: '',
+  fluxpointKey: '',
+  zoom: { scale: 1, tx: 0, ty: 0 },
   keyboardEnabled: true,
   keyNext: 'Enter',
   keyPrev: 'ArrowLeft',
@@ -132,6 +135,8 @@ const sourceSelect = $('sourceSelect');
 const nsfwSelect = $('nsfwSelect');
 const tagsGroup = $('tagsGroup');
 const tagsInput = $('tagsInput');
+const keyGroup = $('keyGroup');
+const keyInput = $('keyInput');
 const autoToggle = $('autoReloadToggle');
 const autoLabel = $('autoLabel');
 const intervalInput = $('reloadInterval');
@@ -188,8 +193,7 @@ function applyLang() {
   $('langLabel').textContent = m.language;
   $('srcLabel').textContent = m.source;
   $('nsfwLabel').textContent = m.nsfw;
-  $('tagsLabel').textContent = m.danbooru_tags;
-  tagsInput.placeholder = m.tags_placeholder;
+  $('keyLabel').textContent = m.api_key;
   $('reloadLabel').textContent = m.auto_reload;
   autoLabel.textContent = state.autoReload ? m.on : m.off;
   $('unitLabel').textContent = m.sec;
@@ -216,10 +220,10 @@ function applyLang() {
   $('kbdHint').textContent = m.kbd_hint;
 
   sourceSelect.innerHTML = '';
-  ['catgirl', 'waifu', 'danbooru'].forEach(key => {
+  state.sources.forEach(s => {
     const opt = document.createElement('option');
-    opt.value = key;
-    opt.textContent = m.source_names[key];
+    opt.value = s.key;
+    opt.textContent = s.name;
     sourceSelect.appendChild(opt);
   });
   sourceSelect.value = state.source;
@@ -288,6 +292,12 @@ function showImage(src) {
   mainImage.classList.remove('hidden');
   placeholder.classList.add('hidden');
   spinner.classList.add('hidden');
+  resetZoom();
+}
+
+function sourceDisplayName(key) {
+  const meta = state.sources.find(s => s.key === key);
+  return meta ? meta.name : key;
 }
 
 function showInfo(artist, source) {
@@ -297,8 +307,7 @@ function showInfo(artist, source) {
   } else {
     imageInfo.classList.add('hidden');
   }
-  const names = t('source_names');
-  sourceName.textContent = names[source] || source;
+  sourceName.textContent = sourceDisplayName(source);
 }
 
 function updateNavButtons() {
@@ -308,7 +317,9 @@ function updateNavButtons() {
 
 function updateFavButton() {
   const m = LANG[state.lang];
-  const isFaved = state.currentKey && state.favorites.some(f => f.cacheKey === state.currentKey);
+  const isFaved = state.currentFavId
+    ? true
+    : !!(state.currentKey && state.favorites.some(f => f.cacheKey === state.currentKey));
   $('favText').textContent = isFaved ? m.favorited : m.favorite;
   if (isFaved) {
     favBtn.querySelector('svg').setAttribute('fill', 'currentColor');
@@ -320,11 +331,11 @@ function updateFavButton() {
 }
 
 /* ── History navigation ────────────────────────────────────────── */
-function pushHistory(key, artist, link, filename, source) {
+function pushHistory(key, artist, link, filename, source, isFav = false) {
   if (state.historyIndex < state.history.length - 1) {
     state.history = state.history.slice(0, state.historyIndex + 1);
   }
-  state.history.push({ key, artist, link, filename, source });
+  state.history.push({ key, artist, link, filename, source, isFav });
   state.historyIndex = state.history.length - 1;
   updateNavButtons();
 }
@@ -347,11 +358,13 @@ function goNext() {
 
 function showFromHistory(item) {
   state.currentKey = item.key;
+  state.currentFavId = item.isFav ? item.key : null;
   state.currentArtist = item.artist;
   state.currentLink = item.link;
   state.currentFilename = item.filename;
 
-  showImage(`/api/image/${item.key}`);
+  const src = item.isFav ? `/api/favorites/${item.key}/image` : `/api/image/${item.key}`;
+  showImage(src);
   showInfo(item.artist, item.source);
   downloadBtn.disabled = false;
   favBtn.disabled = false;
@@ -373,6 +386,7 @@ async function fetchImage() {
     const data = await apiJson(`/api/fetch?${params}`);
 
     state.currentKey = data.key;
+    state.currentFavId = null;
     state.currentArtist = data.artist;
     state.currentLink = data.link;
     state.currentFilename = data.filename;
@@ -399,12 +413,143 @@ async function fetchImage() {
 function downloadImage() {
   if (!state.currentKey) return;
   const a = document.createElement('a');
-  a.href = `/api/download/${state.currentKey}`;
+  a.href = state.currentFavId
+    ? `/api/favorites/${state.currentFavId}/download`
+    : `/api/download/${state.currentKey}`;
   a.download = state.currentFilename || 'image';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
 }
+
+/* ── Zoom & Pan ─────────────────────────────────────────────────── */
+const imageWrapper = $('imageWrapper');
+const zoomBadge = $('zoomBadge');
+const ZOOM_MIN = 1;
+const ZOOM_MAX = 5;
+const pointers = new Map();
+let panStart = null;
+let pinchStart = null;
+
+function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+
+function resetZoom() {
+  const z = state.zoom;
+  z.scale = 1;
+  z.tx = 0;
+  z.ty = 0;
+  applyZoom();
+}
+
+function applyZoom() {
+  const z = state.zoom;
+  const zoomed = z.scale > 1;
+  if (zoomed) {
+    mainImage.style.transform = `translate(${z.tx}px, ${z.ty}px) scale(${z.scale})`;
+  } else {
+    mainImage.style.transform = '';
+  }
+  imageWrapper.classList.toggle('zoomed', zoomed);
+  zoomBadge.classList.toggle('hidden', !zoomed);
+  zoomBadge.textContent = `${Math.round(z.scale * 100)}%`;
+}
+
+function clampPan() {
+  const z = state.zoom;
+  const rect = mainImage.getBoundingClientRect();
+  const maxX = Math.max(0, (rect.width - imageWrapper.clientWidth) / 2);
+  const maxY = Math.max(0, (rect.height - imageWrapper.clientHeight) / 2);
+  z.tx = clamp(z.tx, -maxX, maxX);
+  z.ty = clamp(z.ty, -maxY, maxY);
+}
+
+function zoomTo(newScale, px, py) {
+  const z = state.zoom;
+  newScale = clamp(newScale, ZOOM_MIN, ZOOM_MAX);
+  if (newScale === z.scale) return;
+  const rect = mainImage.getBoundingClientRect();
+  const Cx = rect.left + rect.width / 2 - z.tx;
+  const Cy = rect.top + rect.height / 2 - z.ty;
+  const r = newScale / z.scale;
+  z.tx = (px - Cx) - ((px - Cx) - z.tx) * r;
+  z.ty = (py - Cy) - ((py - Cy) - z.ty) * r;
+  z.scale = newScale;
+  clampPan();
+  applyZoom();
+}
+
+function imageVisible() {
+  return !mainImage.classList.contains('hidden');
+}
+
+function pinchData() {
+  const pts = [...pointers.values()];
+  const dx = pts[0].x - pts[1].x;
+  const dy = pts[0].y - pts[1].y;
+  return {
+    dist: Math.hypot(dx, dy),
+    midX: (pts[0].x + pts[1].x) / 2,
+    midY: (pts[0].y + pts[1].y) / 2,
+  };
+}
+
+imageWrapper.addEventListener('wheel', e => {
+  if (!imageVisible()) return;
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+  zoomTo(state.zoom.scale * factor, e.clientX, e.clientY);
+}, { passive: false });
+
+imageWrapper.addEventListener('pointerdown', e => {
+  if (!imageVisible()) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size === 1) {
+    panStart = state.zoom.scale > 1
+      ? { x: e.clientX, y: e.clientY, tx: state.zoom.tx, ty: state.zoom.ty }
+      : null;
+    pinchStart = null;
+  } else if (pointers.size === 2) {
+    panStart = null;
+    pinchStart = { ...pinchData(), scale: state.zoom.scale };
+  }
+  if (panStart) imageWrapper.classList.add('panning');
+  try { imageWrapper.setPointerCapture(e.pointerId); } catch (err) {}
+});
+
+imageWrapper.addEventListener('pointermove', e => {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const z = state.zoom;
+
+  if (pointers.size === 2 && pinchStart) {
+    const now = pinchData();
+    const target = clamp(pinchStart.scale * (now.dist / pinchStart.dist), ZOOM_MIN, ZOOM_MAX);
+    zoomTo(target, now.midX, now.midY);
+  } else if (pointers.size === 1 && panStart) {
+    z.tx = panStart.tx + (e.clientX - panStart.x);
+    z.ty = panStart.ty + (e.clientY - panStart.y);
+    clampPan();
+    applyZoom();
+  }
+});
+
+function endPointer(e) {
+  pointers.delete(e.pointerId);
+  panStart = null;
+  pinchStart = null;
+  imageWrapper.classList.remove('panning');
+  if (pointers.size === 1 && state.zoom.scale > 1) {
+    const p = [...pointers.values()][0];
+    panStart = { x: p.x, y: p.y, tx: state.zoom.tx, ty: state.zoom.ty };
+  }
+}
+
+imageWrapper.addEventListener('pointerup', endPointer);
+imageWrapper.addEventListener('pointercancel', endPointer);
+
+imageWrapper.addEventListener('dblclick', () => {
+  if (imageVisible()) resetZoom();
+});
 
 /* ── Favorites ──────────────────────────────────────────────────── */
 async function loadFavorites() {
@@ -417,6 +562,22 @@ async function loadFavorites() {
 
 async function toggleFavorite() {
   if (!state.currentKey) return;
+
+  if (state.currentFavId) {
+    const id = state.currentFavId;
+    try {
+      await api(`/api/favorites/${id}`, { method: 'DELETE' });
+      const fav = state.favorites.find(f => f.id === id);
+      state.favorites = state.favorites.filter(f => f.id !== id);
+      state.currentKey = (fav && fav.cacheKey) || state.currentKey;
+      state.currentFavId = null;
+      updateFavButton();
+    } catch (e) {
+      console.error('Failed to remove favorite:', e);
+    }
+    return;
+  }
+
   const existing = state.favorites.find(f => f.cacheKey === state.currentKey);
   if (existing) {
     try {
@@ -430,7 +591,6 @@ async function toggleFavorite() {
   }
   try {
     const fav = await apiJson(`/api/favorites/${state.currentKey}`, { method: 'POST' });
-    fav.cacheKey = state.currentKey;
     state.favorites.unshift(fav);
     updateFavButton();
   } catch (e) {
@@ -450,7 +610,7 @@ function renderFavorites() {
       <img class="fav-thumb" src="/api/favorites/${f.id}/image" alt="${f.artist || ''}" loading="lazy" />
       <div class="fav-info">
         <span class="fav-artist">${f.artist || m.artist_unknown}</span>
-        <span class="fav-source">${(m.source_names[f.source] || f.source)}</span>
+        <span class="fav-source">${sourceDisplayName(f.source)}</span>
       </div>
       <button class="btn-icon fav-del" data-id="${f.id}" title="Delete">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -466,10 +626,11 @@ function renderFavorites() {
       const fav = state.favorites.find(f => f.id === el.dataset.id);
       if (fav) {
         state.currentKey = fav.id;
+        state.currentFavId = fav.id;
         state.currentArtist = fav.artist;
         state.currentLink = fav.link;
         state.currentFilename = fav.filename;
-        pushHistory(fav.id, fav.artist, fav.link, fav.filename, fav.source);
+        pushHistory(fav.id, fav.artist, fav.link, fav.filename, fav.source, true);
         showImage(`/api/favorites/${fav.id}/image`);
         showInfo(fav.artist, fav.source);
         downloadBtn.disabled = false;
@@ -542,8 +703,9 @@ function enableKeyCapture(input, configKey) {
     state[configKey] = e.code;
     input.value = keyDisplayName(e.code);
     input.blur();
-    const cfgKey = 'key_' + configKey.replace(/^key/, '').replace(/[A-Z]/g, c => '_' + c.toLowerCase());
-    saveConfig({ [cfgKey]: e.code });
+    const field = configKey.replace(/^key/, '');
+    const snake = field.charAt(0).toLowerCase() + field.slice(1);
+    saveConfig({ [`key_${snake}`]: e.code });
   });
 }
 
@@ -611,12 +773,16 @@ function stopProgressBar() {
 /* ── Config ──────────────────────────────────────────────────────── */
 async function loadConfig() {
   const cfg = await apiJson('/api/config');
-  state.lang = cfg.lang || (navigator.language.startsWith('zh') ? 'zh' : 'en');
+  state.lang = (cfg.lang && cfg.lang !== 'auto')
+    ? cfg.lang
+    : (navigator.language.startsWith('zh') ? 'zh' : 'en');
   state.source = cfg.source || 'catgirl';
   state.nsfw = cfg.nsfw_mode || 'BLOCK_NSFW';
   state.autoReload = cfg.auto_reload || false;
   state.reloadInterval = cfg.auto_reload_interval || 30;
   state.danbooruTags = cfg.danbooru_tags || '';
+  state.category = cfg.category || '';
+  state.fluxpointKey = cfg.fluxpoint_key || '';
   state.keyboardEnabled = cfg.keyboard_enabled !== false;
   state.keyNext = cfg.key_next || 'Enter';
   state.keyPrev = cfg.key_prev || 'ArrowLeft';
@@ -630,8 +796,8 @@ async function loadConfig() {
   autoToggle.checked = state.autoReload;
   autoLabel.textContent = state.autoReload ? t('on') : t('off');
   intervalInput.value = state.reloadInterval;
-  tagsInput.value = state.danbooruTags;
-  toggleTagsGroup(state.source);
+  keyInput.value = state.fluxpointKey;
+  toggleSourceGroups(state.source);
   keyboardToggle.checked = state.keyboardEnabled;
   kbdStatus.textContent = state.keyboardEnabled ? t('on') : t('off');
   keyBindings.classList.toggle('hidden', !state.keyboardEnabled);
@@ -648,8 +814,26 @@ async function saveConfig(partial) {
   });
 }
 
-function toggleTagsGroup(source) {
-  tagsGroup.classList.toggle('hidden', source !== 'danbooru');
+function sourceMeta(source) {
+  return state.sources.find(s => s.key === source) || {};
+}
+
+function toggleSourceGroups(source) {
+  const meta = sourceMeta(source);
+  const showTags = !!meta.has_tags;
+  tagsGroup.classList.toggle('hidden', !showTags);
+  if (showTags) {
+    if (source === 'danbooru') {
+      $('tagsLabel').textContent = t('danbooru_tags');
+      tagsInput.value = state.danbooruTags;
+      tagsInput.placeholder = t('tags_placeholder');
+    } else {
+      $('tagsLabel').textContent = meta.tags_label || t('category');
+      tagsInput.value = state.category;
+      tagsInput.placeholder = '';
+    }
+  }
+  keyGroup.classList.toggle('hidden', source !== 'fluxpoint');
 }
 
 /* ── Event handlers ─────────────────────────────────────────────── */
@@ -664,7 +848,7 @@ langSelect.addEventListener('change', () => {
 
 sourceSelect.addEventListener('change', () => {
   state.source = sourceSelect.value;
-  toggleTagsGroup(state.source);
+  toggleSourceGroups(state.source);
   saveConfig({ source: state.source });
   fetchImage();
 });
@@ -676,9 +860,20 @@ nsfwSelect.addEventListener('change', () => {
 });
 
 tagsInput.addEventListener('change', () => {
-  state.danbooruTags = tagsInput.value;
-  saveConfig({ danbooru_tags: state.danbooruTags });
-  if (state.source === 'danbooru') fetchImage();
+  if (state.source === 'danbooru') {
+    state.danbooruTags = tagsInput.value;
+    saveConfig({ danbooru_tags: state.danbooruTags });
+  } else {
+    state.category = tagsInput.value.trim();
+    saveConfig({ category: state.category });
+  }
+  if (state.source === 'danbooru' || sourceMeta(state.source).has_tags) fetchImage();
+});
+
+keyInput.addEventListener('change', () => {
+  state.fluxpointKey = keyInput.value.trim();
+  saveConfig({ fluxpoint_key: state.fluxpointKey });
+  if (state.source === 'fluxpoint') fetchImage();
 });
 
 autoToggle.addEventListener('change', () => {
@@ -745,7 +940,17 @@ document.addEventListener('keydown', e => {
 });
 
 /* ── Init ────────────────────────────────────────────────────────── */
+async function loadSources() {
+  try {
+    const data = await apiJson('/api/sources');
+    state.sources = Array.isArray(data) ? data : [];
+  } catch {
+    state.sources = [];
+  }
+}
+
 async function init() {
+  await loadSources();
   await loadConfig();
   await loadFavorites();
   fetchImage();
