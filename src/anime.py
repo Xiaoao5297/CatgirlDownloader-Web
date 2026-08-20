@@ -111,7 +111,8 @@ class PurrbotDownloaderAPI(CategoryDownloaderAPI):
         elif nsfw_mode == "SHOW_EVERYTHING":
             path = random.choice(["sfw", "nsfw"])
         category = self.category or "neko"
-        formats = ["gif"] if path == "nsfw" else ["gif", "img"]
+        # Prefer static images (img) over GIFs; some categories only have one format.
+        formats = ["gif"] if path == "nsfw" else ["img", "gif"]
         for fmt in formats:
             try:
                 r = requests.get(
