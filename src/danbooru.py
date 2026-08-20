@@ -134,3 +134,30 @@ class DanbooruDownloaderAPI(BaseDownloaderAPI):
         if extension:
             return f"danbooru_{post_id}.{extension}"
         return f"danbooru_{post_id}"
+
+    def get_metadata(self) -> dict:
+        data = self.info
+        if not data:
+            return {}
+        meta = {}
+        artist = data.get("tag_string_artist")
+        if artist:
+            meta["artist"] = artist.split(" ")[0]
+        if data.get("rating"):
+            meta["rating"] = data["rating"]
+        if data.get("score") is not None:
+            meta["score"] = data["score"]
+        if data.get("fav_count") is not None:
+            meta["favorites"] = data["fav_count"]
+        if data.get("image_width") and data.get("image_height"):
+            meta["width"] = data["image_width"]
+            meta["height"] = data["image_height"]
+        if data.get("file_size") is not None:
+            meta["size"] = data["file_size"]
+        if data.get("source"):
+            meta["source"] = data["source"]
+        if data.get("tag_string"):
+            meta["tags"] = [t for t in data["tag_string"].split() if t]
+        if data.get("created_at"):
+            meta["created_at"] = data["created_at"]
+        return meta

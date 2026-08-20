@@ -84,6 +84,17 @@
         <input type="text" id="tagsInput" placeholder="e.g. cat_ears solo 1girl" />
       </div>
 
+      <!-- Tag Picker (Catgirl / Waifu) -->
+      <div class="sidebar-group hidden" id="tagPickerGroup">
+        <label id="tagPickerLabel">Tags</label>
+        <div class="tag-picker">
+          <div class="tag-chips" id="tagPickerChips"></div>
+          <input type="text" id="tagPickerInput" list="tagPickerOptions" autocomplete="off" />
+          <datalist id="tagPickerOptions"></datalist>
+          <p class="tag-hint" id="tagPickerHint"></p>
+        </div>
+      </div>
+
       <!-- API Key (Fluxpoint) -->
       <div class="sidebar-group hidden" id="keyGroup">
         <label id="keyLabel">API Key</label>
@@ -199,6 +210,7 @@
         <span id="artistName" class="artist-name"></span>
         <span class="info-divider">·</span>
         <span id="sourceName" class="source-name"></span>
+        <span class="image-stats hidden" id="imageStats"></span>
         <div class="info-spacer"></div>
         <button class="btn-link" id="artInfoBtn" title="About this art">
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -234,6 +246,26 @@
         <div class="info-row">
           <span class="info-label" id="fileLabel">Filename</span>
           <span id="modalFilename" class="info-value">—</span>
+        </div>
+        <div class="info-row" id="uploaderRow">
+          <span class="info-label" id="uploaderLabel">Uploader</span>
+          <span id="modalUploader" class="info-value">—</span>
+        </div>
+        <div class="info-row" id="statsRow">
+          <span class="info-label" id="statsLabel">Likes</span>
+          <span id="modalStats" class="info-value">—</span>
+        </div>
+        <div class="info-row" id="nsfwInfoRow">
+          <span class="info-label" id="nsfwInfoLabel">NSFW</span>
+          <span id="modalNsfw" class="info-value">—</span>
+        </div>
+        <div class="info-row" id="createdRow">
+          <span class="info-label" id="createdLabel">Posted</span>
+          <span id="modalCreated" class="info-value">—</span>
+        </div>
+        <div class="info-row" id="tagsRow">
+          <span class="info-label" id="tagsInfoLabel">Tags</span>
+          <span id="modalTags" class="info-value">—</span>
         </div>
       </div>
     </div>

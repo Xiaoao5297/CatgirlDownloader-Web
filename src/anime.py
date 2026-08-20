@@ -82,6 +82,22 @@ class NekosDownloaderAPI(CategoryDownloaderAPI):
             return f"nekosapi_{image_id}.{extension}"
         return f"nekosapi_{image_id}"
 
+    def get_metadata(self) -> dict:
+        data = self.info
+        if not data:
+            return {}
+        meta = {}
+        if data.get("artist_name"):
+            meta["artist"] = data["artist_name"]
+        if data.get("rating"):
+            meta["rating"] = data["rating"]
+            meta["nsfw"] = data["rating"] in ("borderline", "explicit")
+        if data.get("tags"):
+            meta["tags"] = data["tags"]
+        if data.get("source_url"):
+            meta["source"] = data["source_url"]
+        return meta
+
 
 class PurrbotDownloaderAPI(CategoryDownloaderAPI):
     def __init__(self, category: str = "", api_key: str = "") -> None:
@@ -136,6 +152,9 @@ class PurrbotDownloaderAPI(CategoryDownloaderAPI):
             return f"purrbot_{image_id}.{extension}"
         return f"purrbot_{image_id}"
 
+    def get_metadata(self) -> dict:
+        return {"category": self.category or "neko"}
+
 
 class FluxpointDownloaderAPI(CategoryDownloaderAPI):
     def __init__(self, category: str = "", api_key: str = "") -> None:
@@ -151,21 +170,25 @@ class FluxpointDownloaderAPI(CategoryDownloaderAPI):
         elif nsfw_mode == "SHOW_EVERYTHING":
             path = random.choice(["sfw", "nsfw"])
         category = self.category or "neko"
-        try:
-            r = requests.get(
-                f"{self.endpoint}/{path}/img/{category}",
-                headers={"Authorization": self.api_key},
-                timeout=10,
-            )
-            if r.status_code != 200:
+        # Try static image first, fall back to GIF (some categories are gif-only).
+        for fmt in ("img", "gif"):
+            try:
+                r = requests.get(
+                    f"{self.endpoint}/{path}/{fmt}/{category}",
+                    headers={"Authorization": self.api_key},
+                    timeout=10,
+                )
+                if r.status_code == 200:
+                    data = r.json()
+                    if not data.get("success", True):
+                        return None
+                    self.info = data
+                    return data.get("file")
+                if r.status_code != 404:
+                    return None
+            except Exception as e:
+                print(f"Fluxpoint error: {e}")
                 return None
-            data = r.json()
-            if not data.get("success", True):
-                return None
-            self.info = data
-            return data.get("file")
-        except Exception as e:
-            print(f"Fluxpoint error: {e}")
         return None
 
     def get_artist(self, info: Optional[dict] = None) -> Optional[str]:
@@ -189,3 +212,6 @@ class FluxpointDownloaderAPI(CategoryDownloaderAPI):
         if extension:
             return f"fluxpoint_{image_id}.{extension}"
         return f"fluxpoint_{image_id}"
+
+    def get_metadata(self) -> dict:
+        return {"category": self.category or "neko"}

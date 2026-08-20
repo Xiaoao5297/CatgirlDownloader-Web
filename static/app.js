@@ -13,6 +13,18 @@ const LANG = {
     tags_placeholder: '例如：cat_ears solo 1girl',
     category: '分类',
     api_key: 'API Key',
+    catgirl_tags: '标签',
+    tag_hint: '输入后回车添加，点 × 移除',
+    label_uploader: '上传者',
+    label_likes: '点赞',
+    label_favorites: '收藏数',
+    label_score: '评分',
+    label_rating: '评级',
+    label_nsfw: 'NSFW',
+    label_created: '上传时间',
+    label_tags: '标签',
+    nsfw_true: '是',
+    nsfw_false: '否',
     auto_reload: '自动刷新',
     on: '开',
     off: '关',
@@ -58,6 +70,18 @@ const LANG = {
     tags_placeholder: 'e.g. cat_ears solo 1girl',
     category: 'Category',
     api_key: 'API Key',
+    catgirl_tags: 'Tags',
+    tag_hint: 'Type then press Enter to add, × to remove',
+    label_uploader: 'Uploader',
+    label_likes: 'Likes',
+    label_favorites: 'Favorites',
+    label_score: 'Score',
+    label_rating: 'Rating',
+    label_nsfw: 'NSFW',
+    label_created: 'Posted',
+    label_tags: 'Tags',
+    nsfw_true: 'Yes',
+    nsfw_false: 'No',
     auto_reload: 'Auto Reload',
     on: 'On',
     off: 'Off',
@@ -99,12 +123,15 @@ const state = {
   nsfw: 'BLOCK_NSFW',
   autoReload: false,
   reloadInterval: 30,
-  danbooruTags: '',
+  danbooru_tags: '',
+  catgirl_tags: '',
+  waifu_tags: '',
   currentKey: null,
   currentFavId: null,
   currentArtist: null,
   currentLink: null,
   currentFilename: null,
+  currentMeta: {},
   isFetching: false,
   reloadTimer: null,
   progressTimer: null,
@@ -115,6 +142,8 @@ const state = {
   sources: [],
   category: '',
   fluxpointKey: '',
+  pickerTags: [],
+  tagCache: {},
   zoom: { scale: 1, tx: 0, ty: 0 },
   keyboardEnabled: true,
   keyNext: 'Enter',
@@ -135,6 +164,10 @@ const sourceSelect = $('sourceSelect');
 const nsfwSelect = $('nsfwSelect');
 const tagsGroup = $('tagsGroup');
 const tagsInput = $('tagsInput');
+const tagPickerGroup = $('tagPickerGroup');
+const tagPickerChips = $('tagPickerChips');
+const tagPickerInput = $('tagPickerInput');
+const tagPickerOptions = $('tagPickerOptions');
 const keyGroup = $('keyGroup');
 const keyInput = $('keyInput');
 const autoToggle = $('autoReloadToggle');
@@ -152,6 +185,7 @@ const spinner = $('spinner');
 const imageInfo = $('imageInfo');
 const artistName = $('artistName');
 const sourceName = $('sourceName');
+const imageStats = $('imageStats');
 const artInfoBtn = $('artInfoBtn');
 const progressBar = $('progressBar');
 const progressFill = $('progressFill');
@@ -194,6 +228,8 @@ function applyLang() {
   $('srcLabel').textContent = m.source;
   $('nsfwLabel').textContent = m.nsfw;
   $('keyLabel').textContent = m.api_key;
+  $('tagPickerLabel').textContent = m.catgirl_tags;
+  $('tagPickerHint').textContent = m.tag_hint;
   $('reloadLabel').textContent = m.auto_reload;
   autoLabel.textContent = state.autoReload ? m.on : m.off;
   $('unitLabel').textContent = m.sec;
@@ -206,6 +242,11 @@ function applyLang() {
   $('artistLabel').textContent = m.artist;
   $('srcInfoLabel').textContent = m.source_label;
   $('fileLabel').textContent = m.filename;
+  $('uploaderLabel').textContent = m.label_uploader;
+  $('statsLabel').textContent = m.label_likes;
+  $('nsfwInfoLabel').textContent = m.label_nsfw;
+  $('createdLabel').textContent = m.label_created;
+  $('tagsInfoLabel').textContent = m.label_tags;
   $('aboutModalTitle').textContent = m.about_app;
   $('aboutDesc').textContent = m.about_desc;
   $('aboutCredit').innerHTML = m.about_credit;
@@ -245,6 +286,8 @@ function applyLang() {
     modalArtist.textContent = state.currentArtist;
   }
 
+  toggleSourceGroups(state.source);
+  renderMeta();
   updateFavButton();
 }
 
@@ -310,6 +353,58 @@ function showInfo(artist, source) {
   sourceName.textContent = sourceDisplayName(source);
 }
 
+function formatDate(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  try {
+    return d.toLocaleString(state.lang === 'zh' ? 'zh-CN' : 'en-US');
+  } catch {
+    return iso;
+  }
+}
+
+function formatBytes(bytes) {
+  if (bytes == null || isNaN(bytes)) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderMeta() {
+  const meta = state.currentMeta || {};
+  const parts = [];
+  if (meta.score != null) parts.push(`▲ ${meta.score}`);
+  if (meta.likes != null) parts.push(`♥ ${meta.likes}`);
+  if (meta.favorites != null) parts.push(`★ ${meta.favorites}`);
+  if (meta.rating) parts.push(meta.rating.toUpperCase());
+  if (meta.width && meta.height) parts.push(`${meta.width}×${meta.height}`);
+  if (meta.gif != null) parts.push(meta.gif ? 'GIF' : 'IMG');
+  imageStats.textContent = parts.join('  ');
+  imageStats.classList.toggle('hidden', parts.length === 0);
+
+  $('modalUploader').textContent = meta.uploader || '—';
+  const stats = [];
+  if (meta.rating) stats.push(`${t('label_rating')}: ${meta.rating}`);
+  if (meta.score != null) stats.push(`${t('label_score')}: ${meta.score}`);
+  if (meta.likes != null) stats.push(`${t('label_likes')}: ${meta.likes}`);
+  if (meta.favorites != null) stats.push(`${t('label_favorites')}: ${meta.favorites}`);
+  if (meta.width && meta.height) stats.push(`${meta.width}×${meta.height}`);
+  const size = formatBytes(meta.size);
+  if (size) stats.push(size);
+  $('modalStats').textContent = stats.join('  ·  ') || '—';
+  $('modalNsfw').textContent = meta.nsfw == null ? '—' : (meta.nsfw ? t('nsfw_true') : t('nsfw_false'));
+  $('modalCreated').textContent = meta.created_at ? formatDate(meta.created_at) : '—';
+  if (Array.isArray(meta.tags) && meta.tags.length) {
+    $('tagsRow').classList.remove('hidden');
+    $('modalTags').textContent = meta.tags.join(', ');
+  } else if (meta.category) {
+    $('tagsRow').classList.remove('hidden');
+    $('modalTags').textContent = meta.category;
+  } else {
+    $('tagsRow').classList.add('hidden');
+  }
+}
+
 function updateNavButtons() {
   prevBtn.disabled = state.historyIndex <= 0;
   nextBtn.disabled = state.historyIndex >= state.history.length - 1;
@@ -331,11 +426,11 @@ function updateFavButton() {
 }
 
 /* ── History navigation ────────────────────────────────────────── */
-function pushHistory(key, artist, link, filename, source, isFav = false) {
+function pushHistory(key, artist, link, filename, source, isFav = false, meta = {}) {
   if (state.historyIndex < state.history.length - 1) {
     state.history = state.history.slice(0, state.historyIndex + 1);
   }
-  state.history.push({ key, artist, link, filename, source, isFav });
+  state.history.push({ key, artist, link, filename, source, isFav, meta });
   state.historyIndex = state.history.length - 1;
   updateNavButtons();
 }
@@ -362,10 +457,12 @@ function showFromHistory(item) {
   state.currentArtist = item.artist;
   state.currentLink = item.link;
   state.currentFilename = item.filename;
+  state.currentMeta = item.meta || {};
 
   const src = item.isFav ? `/api/favorites/${item.key}/image` : `/api/image/${item.key}`;
   showImage(src);
   showInfo(item.artist, item.source);
+  renderMeta();
   downloadBtn.disabled = false;
   favBtn.disabled = false;
   updateNavButtons();
@@ -390,11 +487,13 @@ async function fetchImage() {
     state.currentArtist = data.artist;
     state.currentLink = data.link;
     state.currentFilename = data.filename;
+    state.currentMeta = data.metadata || {};
 
-    pushHistory(data.key, data.artist, data.link, data.filename, data.source);
+    pushHistory(data.key, data.artist, data.link, data.filename, data.source, false, state.currentMeta);
 
     showImage(`/api/image/${data.key}`);
     showInfo(data.artist, data.source);
+    renderMeta();
     downloadBtn.disabled = false;
     favBtn.disabled = false;
     updateFavButton();
@@ -630,9 +729,11 @@ function renderFavorites() {
         state.currentArtist = fav.artist;
         state.currentLink = fav.link;
         state.currentFilename = fav.filename;
-        pushHistory(fav.id, fav.artist, fav.link, fav.filename, fav.source, true);
+        state.currentMeta = fav.meta || {};
+        pushHistory(fav.id, fav.artist, fav.link, fav.filename, fav.source, true, state.currentMeta);
         showImage(`/api/favorites/${fav.id}/image`);
         showInfo(fav.artist, fav.source);
+        renderMeta();
         downloadBtn.disabled = false;
         favBtn.disabled = false;
         updateFavButton();
@@ -780,8 +881,12 @@ async function loadConfig() {
   state.nsfw = cfg.nsfw_mode || 'BLOCK_NSFW';
   state.autoReload = cfg.auto_reload || false;
   state.reloadInterval = cfg.auto_reload_interval || 30;
-  state.danbooruTags = cfg.danbooru_tags || '';
+  state.danbooru_tags = cfg.danbooru_tags || '';
   state.category = cfg.category || '';
+  state.catgirl_tags = cfg.catgirl_tags || '';
+  state.waifu_tags = cfg.waifu_tags || '';
+  const cfgKey = tagsConfigKey(state.source);
+  state.pickerTags = (cfgKey ? (cfg[cfgKey] || '') : '').split('|').map(s => s.trim()).filter(Boolean);
   state.fluxpointKey = cfg.fluxpoint_key || '';
   state.keyboardEnabled = cfg.keyboard_enabled !== false;
   state.keyNext = cfg.key_next || 'Enter';
@@ -818,22 +923,96 @@ function sourceMeta(source) {
   return state.sources.find(s => s.key === source) || {};
 }
 
+function tagsConfigKey(source) {
+  return sourceMeta(source).tags_config || null;
+}
+
+function tagsDelimiter(source) {
+  return source === 'danbooru' ? ' ' : '|';
+}
+
 function toggleSourceGroups(source) {
   const meta = sourceMeta(source);
-  const showTags = !!meta.has_tags;
-  tagsGroup.classList.toggle('hidden', !showTags);
-  if (showTags) {
-    if (source === 'danbooru') {
-      $('tagsLabel').textContent = t('danbooru_tags');
-      tagsInput.value = state.danbooruTags;
-      tagsInput.placeholder = t('tags_placeholder');
-    } else {
-      $('tagsLabel').textContent = meta.tags_label || t('category');
-      tagsInput.value = state.category;
-      tagsInput.placeholder = '';
-    }
+  const isPicker = !!meta.tag_picker;
+  tagPickerGroup.classList.toggle('hidden', !isPicker);
+  tagsGroup.classList.toggle('hidden', isPicker || !meta.has_tags);
+  if (!isPicker && meta.has_tags) {
+    $('tagsLabel').textContent = meta.tags_label || t('category');
+    tagsInput.value = state.category;
+    tagsInput.placeholder = '';
   }
   keyGroup.classList.toggle('hidden', source !== 'fluxpoint');
+  if (isPicker) {
+    const cfgKey = tagsConfigKey(source);
+    state.pickerTags = (state[cfgKey] || '').split(tagsDelimiter(source)).map(s => s.trim()).filter(Boolean);
+    renderPickerChips();
+    tagPickerInput.value = '';
+    if (meta.tag_dynamic) {
+      tagPickerOptions.innerHTML = '';
+    } else if (state.tagCache[source]) {
+      tagPickerOptions.innerHTML = state.tagCache[source]
+        .map(t => `<option value="${escapeHtml(t.slug || t.name)}"></option>`)
+        .join('');
+    } else {
+      loadPickerTags(source);
+    }
+  }
+}
+
+/* ── Tag picker (Catgirl / Waifu) ───────────────────────────────── */
+async function loadPickerTags(source) {
+  try {
+    const data = await apiJson(`/api/tags?source=${source}`);
+    state.tagCache[source] = Array.isArray(data.tags) ? data.tags : [];
+    tagPickerOptions.innerHTML = state.tagCache[source]
+      .map(tag => `<option value="${escapeHtml(tag.slug || tag.name)}"></option>`)
+      .join('');
+  } catch {
+    state.tagCache[source] = [];
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderPickerChips() {
+  tagPickerChips.innerHTML = state.pickerTags.map((tag, i) =>
+    `<span class="tag-chip">${escapeHtml(tag)}<button type="button" class="tag-chip-x" data-i="${i}" aria-label="remove">×</button></span>`
+  ).join('');
+  tagPickerChips.querySelectorAll('.tag-chip-x').forEach(btn => {
+    btn.addEventListener('click', () => removePickedTag(parseInt(btn.dataset.i, 10)));
+  });
+}
+
+function savePickedTags() {
+  const key = tagsConfigKey(state.source);
+  if (!key) return;
+  const joined = state.pickerTags.join(tagsDelimiter(state.source));
+  state[key] = joined;
+  saveConfig({ [key]: joined });
+  fetchImage();
+}
+
+function addPickedTag(raw) {
+  const tag = (raw || '').trim();
+  if (!tag) return;
+  if (sourceMeta(state.source).tag_single) {
+    state.pickerTags = [tag];
+  } else {
+    if (state.pickerTags.includes(tag)) return;
+    if (state.pickerTags.length >= 20) return;
+    state.pickerTags.push(tag);
+  }
+  tagPickerInput.value = '';
+  renderPickerChips();
+  savePickedTags();
+}
+
+function removePickedTag(i) {
+  state.pickerTags.splice(i, 1);
+  renderPickerChips();
+  savePickedTags();
 }
 
 /* ── Event handlers ─────────────────────────────────────────────── */
@@ -860,14 +1039,9 @@ nsfwSelect.addEventListener('change', () => {
 });
 
 tagsInput.addEventListener('change', () => {
-  if (state.source === 'danbooru') {
-    state.danbooruTags = tagsInput.value;
-    saveConfig({ danbooru_tags: state.danbooruTags });
-  } else {
-    state.category = tagsInput.value.trim();
-    saveConfig({ category: state.category });
-  }
-  if (state.source === 'danbooru' || sourceMeta(state.source).has_tags) fetchImage();
+  state.category = tagsInput.value.trim();
+  saveConfig({ category: state.category });
+  fetchImage();
 });
 
 keyInput.addEventListener('change', () => {
@@ -875,6 +1049,43 @@ keyInput.addEventListener('change', () => {
   saveConfig({ fluxpoint_key: state.fluxpointKey });
   if (state.source === 'fluxpoint') fetchImage();
 });
+
+tagPickerInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    addPickedTag(tagPickerInput.value);
+  } else if (e.key === 'Backspace' && !tagPickerInput.value && state.pickerTags.length) {
+    removePickedTag(state.pickerTags.length - 1);
+  }
+});
+
+tagPickerInput.addEventListener('change', () => {
+  if (tagPickerInput.value.trim()) addPickedTag(tagPickerInput.value);
+});
+
+let tagSearchTimer = null;
+
+tagPickerInput.addEventListener('input', () => {
+  if (!sourceMeta(state.source).tag_dynamic) return;
+  clearTimeout(tagSearchTimer);
+  const q = tagPickerInput.value.trim();
+  tagSearchTimer = setTimeout(() => updateDynamicSuggestions(q), 250);
+});
+
+async function updateDynamicSuggestions(q) {
+  if (!q) {
+    tagPickerOptions.innerHTML = '';
+    return;
+  }
+  try {
+    const data = await apiJson(`/api/tags?source=${state.source}&q=${encodeURIComponent(q)}`);
+    tagPickerOptions.innerHTML = (data.tags || [])
+      .map(t => `<option value="${escapeHtml(t.slug || t.name)}"></option>`)
+      .join('');
+  } catch {
+    tagPickerOptions.innerHTML = '';
+  }
+}
 
 autoToggle.addEventListener('change', () => {
   state.autoReload = autoToggle.checked;
@@ -918,6 +1129,7 @@ artInfoBtn.addEventListener('click', () => {
   modalLink.href = state.currentLink || '#';
   modalLink.querySelector('span').textContent = state.currentLink ? t('open_page') : '—';
   modalFilename.textContent = state.currentFilename || '—';
+  renderMeta();
   artModal.classList.remove('hidden');
 });
 

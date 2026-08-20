@@ -480,6 +480,55 @@ select:focus, input:focus {
   min-height: 40px;
 }
 
+.image-stats {
+  color: var(--accent-light);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Catgirl tag picker */
+.tag-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--accent-subtle);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.75rem;
+}
+
+.tag-chip-x {
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.tag-chip-x:hover { color: var(--text-bright); }
+
+.tag-hint {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
 .artist-name {
   font-weight: 600;
   color: var(--accent-light);
@@ -598,6 +647,8 @@ select:focus, input:focus {
 
 .info-value a { color: var(--accent-light); text-decoration: none; }
 .info-value a:hover { text-decoration: underline; }
+
+#modalTags { word-break: normal; overflow-wrap: anywhere; }
 
 .about-credit { margin-top: 14px; font-size: 0.8rem; color: var(--text-dim); }
 .about-links { margin-top: 10px; }

@@ -32,6 +32,10 @@ class BaseDownloaderAPI(ABC):
             print(f"Error downloading image: {e}")
             return None
 
+    def get_metadata(self) -> dict:
+        """Optional extra image info shown in the 'About' modal."""
+        return {}
+
     @abstractmethod
     def get_filename_suggestion(self, extension: Optional[str], info: Optional[dict] = None) -> str:
         pass
