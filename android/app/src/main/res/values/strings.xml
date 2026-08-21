@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Catgirl Downloader</string>
+
+    <string name="settings">Settings</string>
+    <string name="language">Language</string>
+    <string name="language_auto">Auto</string>
+    <string name="source">Source</string>
+    <string name="nsfw_filter">NSFW Filter</string>
+    <string name="nsfw_block">Block NSFW</string>
+    <string name="nsfw_only">Only NSFW</string>
+    <string name="nsfw_all">Show All</string>
+    <string name="tags">Tags</string>
+    <string name="search_tags">Search tags…</string>
+    <string name="tags_hint">Type a tag and press Enter to add. Tap × to remove.</string>
+    <string name="danbooru_tags">Danbooru Tags</string>
+    <string name="category">Category</string>
+    <string name="api_key">API Key</string>
+    <string name="auto_reload">Auto reload</string>
+    <string name="interval_seconds">Interval (seconds)</string>
+    <string name="preload_count">Preload images</string>
+
+    <string name="new_image">New Image</string>
+    <string name="save">Save</string>
+    <string name="favorite">Favorite</string>
+    <string name="favorited">Favorited</string>
+    <string name="favorites">Favorites</string>
+    <string name="favorites_empty">No favorites yet. Tap the heart to save an image.</string>
+    <string name="image">Image</string>
+    <string name="loading">Loading…</string>
+    <string name="placeholder_text">Tap "New Image" to start!</string>
+    <string name="error_load">Could not load image. Try again.</string>
+    <string name="prev">Previous</string>
+    <string name="next">Next</string>
+    <string name="delete">Delete</string>
+    <string name="retry">Retry</string>
+
+    <string name="about">About</string>
+    <string name="about_desc">A native Android image browser for catgirl, waifu and Danbooru artwork. Sources: nekos.moe, waifu.im, danbooru.donmai.us, nekosapi.com, purrbot.site, fluxpoint.dev.</string>
+    <string name="about_credit">Based on Catgirl Downloader by NyarchLinux</string>
+    <string name="about_link">View on GitHub</string>
+
+    <string name="about_art">About this art</string>
+    <string name="artist">Artist</string>
+    <string name="artist_unknown">Unknown</string>
+    <string name="source_label">Source</string>
+    <string name="filename">Filename</string>
+    <string name="posted">Posted</string>
+    <string name="rating">Rating</string>
+    <string name="score">Score</string>
+    <string name="likes">Likes</string>
+    <string name="favorites_count">Favorites</string>
+    <string name="size">Size</string>
+    <string name="nsfw">NSFW</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="open_page">Open page</string>
+    <string name="uploader">Uploader</string>
+
+    <string name="added_to_gallery">Saved to Pictures/CatgirlDownloader</string>
+    <string name="save_failed">Could not save the image</string>
+    <string name="favorited_added">Added to favorites</string>
+    <string name="favorited_removed">Removed from favorites</string>
+</resources>

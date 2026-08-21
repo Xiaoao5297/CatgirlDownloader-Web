@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">猫娘下载器</string>
+
+    <string name="settings">设置</string>
+    <string name="language">语言</string>
+    <string name="language_auto">自动</string>
+    <string name="source">图片来源</string>
+    <string name="nsfw_filter">NSFW 过滤</string>
+    <string name="nsfw_block">屏蔽 NSFW</string>
+    <string name="nsfw_only">仅 NSFW</string>
+    <string name="nsfw_all">全部显示</string>
+    <string name="tags">标签</string>
+    <string name="search_tags">搜索标签…</string>
+    <string name="tags_hint">输入标签后回车添加，点击 × 移除。</string>
+    <string name="danbooru_tags">Danbooru 标签</string>
+    <string name="category">分类</string>
+    <string name="api_key">API Key</string>
+    <string name="auto_reload">自动刷新</string>
+    <string name="interval_seconds">间隔（秒）</string>
+    <string name="preload_count">预下载张数</string>
+
+    <string name="new_image">新图片</string>
+    <string name="save">保存</string>
+    <string name="favorite">收藏</string>
+    <string name="favorited">已收藏</string>
+    <string name="favorites">收藏夹</string>
+    <string name="favorites_empty">还没有收藏。点击爱心保存图片。</string>
+    <string name="image">图片</string>
+    <string name="loading">加载中…</string>
+    <string name="placeholder_text">点击「新图片」开始！</string>
+    <string name="error_load">图片加载失败，请重试！</string>
+    <string name="prev">上一张</string>
+    <string name="next">下一张</string>
+    <string name="delete">删除</string>
+    <string name="retry">重试</string>
+
+    <string name="about">关于</string>
+    <string name="about_desc">一款原生安卓猫娘、Waifu 和 Danbooru 图片浏览器。图片来源：nekos.moe、waifu.im、danbooru.donmai.us、nekosapi.com、purrbot.site、fluxpoint.dev。</string>
+    <string name="about_credit">基于 Catgirl Downloader by NyarchLinux</string>
+    <string name="about_link">在 GitHub 上查看</string>
+
+    <string name="about_art">作品信息</string>
+    <string name="artist">艺术家</string>
+    <string name="artist_unknown">未知</string>
+    <string name="source_label">来源</string>
+    <string name="filename">文件名</string>
+    <string name="posted">上传时间</string>
+    <string name="rating">评级</string>
+    <string name="score">评分</string>
+    <string name="likes">点赞</string>
+    <string name="favorites_count">收藏数</string>
+    <string name="size">大小</string>
+    <string name="nsfw">NSFW</string>
+    <string name="yes">是</string>
+    <string name="no">否</string>
+    <string name="open_page">打开页面</string>
+    <string name="uploader">上传者</string>
+
+    <string name="added_to_gallery">已保存到 Pictures/CatgirlDownloader</string>
+    <string name="save_failed">保存图片失败</string>
+    <string name="favorited_added">已添加到收藏夹</string>
+    <string name="favorited_removed">已从收藏夹移除</string>
+</resources>
