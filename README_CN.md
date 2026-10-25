@@ -40,7 +40,8 @@ bash start.sh
 ```bash
 cd web
 pip install -r requirements.txt
-python3 server.py
+python3 server.py            # 生产模式
+python3 server.py --debug    # 开发模式（Flask 调试器）
 ```
 
 浏览器打开 **http://localhost:5000** 即可使用。
@@ -61,7 +62,7 @@ python3 server.py
 
 ```
 web/
-├── server.py              # Flask 后端
+├── server.py              # Flask 入口（python3 server.py --debug 启用调试）
 ├── requirements.txt       # Python 依赖
 ├── start.sh               # Linux / macOS 启动脚本
 ├── start.bat              # Windows CMD 启动脚本
@@ -73,7 +74,14 @@ web/
 │   ├── catgirl.py
 │   ├── waifu.py
 │   ├── danbooru.py
+│   ├── anime.py
 │   └── types.py
+├── webapp/                # Web 后端模块
+│   ├── routes.py          # Flask 路由
+│   ├── sources.py         # 图片源注册表与工厂
+│   ├── images.py          # 图片缓存与预加载
+│   ├── favorites.py       # 收藏逻辑
+│   └── config.py          # 配置持久化
 └── static/                # 前端
     ├── index.html
     ├── style.css

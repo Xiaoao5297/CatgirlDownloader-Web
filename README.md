@@ -39,7 +39,8 @@ Or manually:
 ```bash
 cd web
 pip install -r requirements.txt
-python3 server.py
+python3 server.py            # production
+python3 server.py --debug    # development (Flask debugger)
 ```
 
 Then open **http://localhost:5000** in your browser.
@@ -56,7 +57,7 @@ The server listens on `0.0.0.0:5000`. Find your local IP (`ipconfig` on Windows,
 
 ```
 web/
-├── server.py              # Flask backend
+├── server.py              # Flask entry point (python3 server.py --debug enables the debugger)
 ├── requirements.txt       # Python dependencies
 ├── start.sh               # Linux / macOS launcher
 ├── start.bat              # Windows CMD launcher
@@ -67,7 +68,14 @@ web/
 │   ├── catgirl.py
 │   ├── waifu.py
 │   ├── danbooru.py
+│   ├── anime.py
 │   └── types.py
+├── webapp/                # Web backend modules
+│   ├── routes.py          # Flask routes
+│   ├── sources.py         # Source registry & API factory
+│   ├── images.py          # Image cache & preload
+│   ├── favorites.py       # Favorites logic
+│   └── config.py          # Config persistence
 └── static/                # Frontend
     ├── index.html
     ├── style.css
