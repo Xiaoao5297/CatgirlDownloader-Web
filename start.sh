@@ -18,7 +18,7 @@ echo " ✓ Python $(python3 --version | cut -d' ' -f2) found"
 # Check / install dependencies
 if ! python3 -c "import flask" 2>/dev/null; then
   echo " → Installing Python dependencies..."
-  python3 -m pip install -r requirements.txt --quiet
+  python3 -m pip install -r requirements.txt
   echo " ✓ Dependencies installed"
 else
   echo " ✓ Dependencies satisfied"
@@ -29,4 +29,5 @@ echo " * Starting server..."
 echo " * Open http://localhost:5000 in your browser"
 echo ""
 
-exec python3 server.py
+# Pass any extra arguments (e.g. --debug) to the server
+exec python3 server.py "$@"

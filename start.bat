@@ -36,5 +36,6 @@ echo  * Starting server...
 echo  * Open http://localhost:5000 in your browser
 echo.
 
-%PYTHON% server.py
+REM Pass any extra arguments (e.g. --debug) to the server
+%PYTHON% server.py %*
 pause

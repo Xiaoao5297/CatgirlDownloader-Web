@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Catgirl Downloader - Web Backend Server"""
 
+import argparse
 import os
 import json
 import time
@@ -583,7 +584,18 @@ def index():
 
 # ── Main ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    host = os.environ.get("HOST", "0.0.0.0")
+    parser = argparse.ArgumentParser(description="Catgirl Downloader Web")
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="run Flask in debug mode (development only)",
+    )
+    parser.add_argument("--host", default=None, help="bind host")
+    parser.add_argument("--port", type=int, default=None, help="bind port")
+    args = parser.parse_args()
+
+    host = args.host or os.environ.get("HOST", "0.0.0.0")
+    port = args.port if args.port is not None else int(os.environ.get("PORT", 5000))
+
     print(f"Catgirl Downloader Web — http://{host}:{port}")
-    app.run(host=host, port=port, debug=True)
+    app.run(host=host, port=port, debug=args.debug)

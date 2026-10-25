@@ -37,4 +37,5 @@ Write-Host " * Starting server..." -ForegroundColor Cyan
 Write-Host " * Open http://localhost:5000 in your browser" -ForegroundColor White
 Write-Host ""
 
-& $python server.py
+# Pass any extra arguments (e.g. --debug) to the server
+& $python server.py @args
