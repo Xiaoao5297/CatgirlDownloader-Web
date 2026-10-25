@@ -56,6 +56,9 @@ const LANG = {
     kbd_hint: '点击输入框后按下按键以重新绑定',
     kbd_listening: '按下按键...',
     no_favs: '还没有收藏。点击 ☆ 按钮收藏图片。',
+    action_bar: '按钮位置',
+    action_bar_top: '上方',
+    action_bar_bottom: '下方',
   },
   en: {
     title: 'Catgirl Downloader',
@@ -113,6 +116,9 @@ const LANG = {
     kbd_hint: 'Click input then press a key to rebind',
     kbd_listening: 'Press a key...',
     no_favs: 'No favorites yet. Click ☆ to save an image.',
+    action_bar: 'Button Position',
+    action_bar_top: 'Top',
+    action_bar_bottom: 'Bottom',
   },
 };
 
@@ -150,6 +156,7 @@ const state = {
   keyPrev: 'ArrowLeft',
   keyDownload: 'Space',
   keyFavorite: 'KeyF',
+  actionBarPosition: 'bottom',
 };
 
 /* ── DOM refs ──────────────────────────────────────────────────── */
@@ -212,6 +219,8 @@ const keyPrevInput = $('keyPrevInput');
 const keySaveInput = $('keySaveInput');
 const keyFavInput = $('keyFavInput');
 
+const actionBarSelect = $('actionBarSelect');
+
 /* ── i18n apply ─────────────────────────────────────────────────── */
 function t(key) { return LANG[state.lang][key] || LANG.en[key] || key; }
 
@@ -259,6 +268,10 @@ function applyLang() {
   $('kbdSaveLabel').textContent = m.kbd_save;
   $('kbdFavLabel').textContent = m.kbd_fav;
   $('kbdHint').textContent = m.kbd_hint;
+  $('actionBarLabel').textContent = m.action_bar;
+  actionBarSelect.querySelector('option[value="top"]').textContent = m.action_bar_top;
+  actionBarSelect.querySelector('option[value="bottom"]').textContent = m.action_bar_bottom;
+  actionBarSelect.value = state.actionBarPosition;
 
   sourceSelect.innerHTML = '';
   state.sources.forEach(s => {
@@ -893,6 +906,7 @@ async function loadConfig() {
   state.keyPrev = cfg.key_prev || 'ArrowLeft';
   state.keyDownload = cfg.key_download || 'Space';
   state.keyFavorite = cfg.key_favorite || 'KeyF';
+  state.actionBarPosition = cfg.action_bar_position === 'top' ? 'top' : 'bottom';
 
   langSelect.value = state.lang;
   applyLang();
@@ -907,8 +921,13 @@ async function loadConfig() {
   kbdStatus.textContent = state.keyboardEnabled ? t('on') : t('off');
   keyBindings.classList.toggle('hidden', !state.keyboardEnabled);
   updateKeyInputs();
+  applyActionBarPosition(state.actionBarPosition);
 
   if (state.autoReload) startAutoReload();
+}
+
+function applyActionBarPosition(pos) {
+  document.body.classList.toggle('action-bar-top', pos === 'top');
 }
 
 async function saveConfig(partial) {
@@ -1109,6 +1128,12 @@ keyboardToggle.addEventListener('change', () => {
   kbdStatus.textContent = state.keyboardEnabled ? t('on') : t('off');
   keyBindings.classList.toggle('hidden', !state.keyboardEnabled);
   saveConfig({ keyboard_enabled: state.keyboardEnabled });
+});
+
+actionBarSelect.addEventListener('change', () => {
+  state.actionBarPosition = actionBarSelect.value === 'top' ? 'top' : 'bottom';
+  applyActionBarPosition(state.actionBarPosition);
+  saveConfig({ action_bar_position: state.actionBarPosition });
 });
 
 enableKeyCapture(keyNextInput, 'keyNext');

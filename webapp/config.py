@@ -25,6 +25,7 @@ _DEFAULT_CONFIG = {
     "key_prev": "ArrowLeft",
     "key_download": "Space",
     "key_favorite": "KeyF",
+    "action_bar_position": "bottom",
 }
 
 FAVORITES_DIR = os.path.join(CONFIG_DIR, "favorites")
