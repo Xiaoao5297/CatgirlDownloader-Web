@@ -5,3 +5,14 @@ cat-env/
 .qwen/
 *.log
 .DS_Store
+
+# Backups / editor
+*.bak
+*.swp
+*~
+
+# Python / OS caches
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
