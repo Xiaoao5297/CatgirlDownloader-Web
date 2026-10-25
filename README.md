@@ -30,8 +30,8 @@ A web-based image browser for catgirl, waifu, and Danbooru artwork. Originally a
 cd web
 # Linux
 bash start.sh
-# Windows
-.\start.sh
+# Windows (PowerShell)
+.\start.ps1
 ```
 
 Or manually:

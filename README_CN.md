@@ -31,8 +31,8 @@
 cd web
 # Linux
 bash start.sh
-# Windows
-.\start.bash
+# Windows (PowerShell)
+.\start.ps1
 ```
 
 或手动运行：
